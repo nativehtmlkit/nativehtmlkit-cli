@@ -1,13 +1,12 @@
-# NativeHTMLKit CLI — agent instructions
+# NativeHTMLKit CLI — Agent instructions
 
-This is an **independent Rust CLI repository**. It currently holds research/IDL and placeholders, **not a working CLI**.
-
-In the standard workspace read `../../AGENTS.md`, `../../agents/shared.md`, `../../docs/architecture/boundaries.md`, `../../docs/bugs/bug_list.md`, and `../../MIGRATION-HANDOFF.md`. If cloned alone, follow these rules and treat the Project repository as optional local context.
-
-1. CLI source, Cargo workspace and releases are owned here, **not inside Core**. Older `docs/CLI-Spec/` research suggested an initial in-Core crate; that choice was superseded. Never add source-path dependencies on private Core Rust crates.
-2. Consume qualified, pinned NativeHTMLKit Core **host binaries and protocol contract** with hashes; allow explicit local binary path only for development. No Python wheels, mandatory Python/PowerShell, Node, browser, or HTTP server.
-3. Canonical executable name `nativehtmlkit`; short `nhk` executable alias. Keep CLI and wire/API versions distinct.
-4. First gate: `printf 'alpha\nbeta\ngamma\n' | nhk select --multi` on Linux KDE Wayland and interactive Windows. Submit emits only selected lines from the **launcher** to stdout; diagnostics to stderr. Cancel emits nothing and has a distinct status. Handle broken pipe, SIGINT, Unicode, injection, race and process cleanup.
-5. If Core fails or lacks a needed function, **do not modify Core while acting as the CLI agent**. Reproduce it, record expected/observed, platform/version and a workaround in Project `docs/bugs/bug_list.md`; then request/coordinate a Core-owned fix. Don't weaken tests.
-6. GitHub Actions **manual `workflow_dispatch` only**; never auto-publish or trigger on Core releases. Report actual test evidence and hashes. Do not claim CLI commands work until implementation passes acceptance.
-7. Read `docs/CLI-Spec/README.md` and technical files as **proposals**, not authoritative runtime state. Project and this file take precedence over conflicting older research prompts.
+1. This is an independent Rust CLI repo. Do NOT depend on `../nativehtmlkit-core/crates/*`, embed the renderer, launch a Python/PowerShell SDK or rebuild Core as an implicit packaging step.
+2. Read `README.md` and `docs/QUALIFICATION.md` first. The Core protocol v1 candidate is located in the sibling Core repository when present; standalone clones must use a released Core protocol artifact.
+3. CLI public executable is `nativehtmlkit` and short alias `nhk`. The binary's hidden `__backend` subcommand is for the Core-supervised process; users invoke `select`, `view`, `form`, `doctor`.
+4. The input source is stdin, output bytes go only to stdout after Submit; any logs must go to stderr. Exit code 2 means Cancel; errors fail closed.
+5. Complete/verify local integration with Core v1 before declaring a stable release. Maintain source-derived protocol compatibility, not optimistic assumptions.
+6. Run `cargo fmt`, `cargo clippy`, `cargo test`, then real native Wayland/Windows qualification, including actual screenshots/traces and process cleanup. Never fabricate PASS status.
+7. No GitHub Actions, remote CI or registry publication; local builds and local verification only. `gh release create` is permitted only when explicitly requested.
+8. Report Core defects in project `docs/bugs/bug_list.md` when available; don't secretly edit Core from within the CLI task.
+9. Preserve this repository as independently cloneable/buildable. Local host override can be set through `NATIVEHTMLKIT_HOST_BINARY` for development; distributions consume pinned qualified Core artifacts.
+10. See `../..` project shared instructions when available, otherwise use these instructions without assuming another checkout exists.

@@ -1,5 +1,3 @@
-# Claude Code — NativeHTMLKit CLI
+# CLI agent entry point
 
-Start with [`AGENTS.md`](AGENTS.md). When inside the standard workspace, also consult Project-root `../../AGENTS.md`, `../../agents/shared.md`, and `../../MIGRATION-HANDOFF.md`.
-
-This repository owns an independent CLI, not a crate nested in Core. Treat older research recommendations as historical; report Core bugs to the Project register and keep all GitHub Actions manual.
+Read `AGENTS.md`, `README.md`, and `docs/QUALIFICATION.md`. This is an independent Rust repository. Review sibling Core `protocol/README.md` only if available. Local-only builds, tests, artifacts and optional explicit GitHub Releases; never start GitHub Actions workflows. Treat unverified native scenarios as BLOCKED.
