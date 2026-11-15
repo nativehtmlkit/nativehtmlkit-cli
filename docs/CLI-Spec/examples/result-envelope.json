@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "kind": "select",
+  "status": "submitted",
+  "selected_indices": [
+    0,
+    2
+  ],
+  "selected": [
+    "alpha",
+    "gamma"
+  ]
+}

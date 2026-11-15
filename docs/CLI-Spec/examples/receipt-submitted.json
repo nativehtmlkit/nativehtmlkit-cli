@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "kind": "select",
+  "status": "submitted",
+  "session_nonce": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "dataset_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "selected_indices": [
+    0,
+    2
+  ]
+}

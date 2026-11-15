@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nativehtmlkit:cli:receipt:v1",
+  "title": "Private Atomic Result Receipt V1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "session_nonce",
+    "dataset_sha256",
+    "kind",
+    "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "session_nonce": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "dataset_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "select",
+        "view",
+        "input",
+        "confirm",
+        "form"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "submitted",
+        "cancelled"
+      ]
+    },
+    "selected_indices": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "form_values": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "text_value": {
+      "type": "string"
+    },
+    "accepted": {
+      "type": "boolean"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "cancelled"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "selected_indices"
+              ]
+            },
+            {
+              "required": [
+                "form_values"
+              ]
+            },
+            {
+              "required": [
+                "text_value"
+              ]
+            },
+            {
+              "required": [
+                "accepted"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "submitted"
+          },
+          "kind": {
+            "const": "select"
+          }
+        },
+        "required": [
+          "status",
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "selected_indices"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "submitted"
+          },
+          "kind": {
+            "const": "form"
+          }
+        },
+        "required": [
+          "status",
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "form_values"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "submitted"
+          },
+          "kind": {
+            "const": "input"
+          }
+        },
+        "required": [
+          "status",
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "text_value"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "submitted"
+          },
+          "kind": {
+            "const": "confirm"
+          }
+        },
+        "required": [
+          "status",
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "accepted"
+        ],
+        "properties": {
+          "accepted": {
+            "const": true
+          }
+        }
+      }
+    }
+  ]
+}
