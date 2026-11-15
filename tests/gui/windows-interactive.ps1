@@ -257,20 +257,26 @@ $C['s09_keyboard'] = {
 $C['s09_resize'] = {
     Start-Case 's09-resize' $abc @('view', '--title', 'NHK resize')
     $w = Find-Window 'NHK resize'; Focus-Window $w; Shot '01-before'
-    $r = $w.Current.BoundingRectangle
-    [NhkInput]::SetCursorPos([int]$r.Right - 3, [int]$r.Bottom - 3); Start-Sleep -Milliseconds 200
-    # left-drag the bottom-right resize border by -250,-150 with real input
-    Add-Type -AssemblyName System.Windows.Forms
-    [System.Windows.Forms.Cursor]::Position = [System.Drawing.Point]::new([int]$r.Right - 3, [int]$r.Bottom - 3)
+    $hwnd = [IntPtr]$w.Current.NativeWindowHandle
+    $before = New-Object NhkInput+RECT; [void][NhkInput]::GetWindowRect($hwnd, [ref]$before)
     $sig = '[DllImport("user32.dll")] public static extern void mouse_event(uint f, int x, int y, uint d, IntPtr e);'
     if (-not ('NhkMouse' -as [type])) { Add-Type -Name NhkMouse -Namespace '' -MemberDefinition $sig }
+    # Grab the real frame's bottom-right sizing border (outside the client area) with the mouse.
+    $x0 = $before.Right - 4; $y0 = $before.Bottom - 4
+    [void][NhkInput]::SetCursorPos($x0, $y0); Start-Sleep -Milliseconds 300
     [NhkMouse]::mouse_event(0x0002, 0, 0, 0, [IntPtr]::Zero)
-    1..15 | ForEach-Object { [System.Windows.Forms.Cursor]::Position = [System.Drawing.Point]::new([int]$r.Right - 3 - 17 * $_, [int]$r.Bottom - 3 - 10 * $_); Start-Sleep -Milliseconds 30 }
-    [NhkMouse]::mouse_event(0x0004, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 700; Shot '02-after-resize'
-    $after = $w.Current.BoundingRectangle
-    "before=$r after=$after" | Set-Content (Join-Path $script:CaseDir 'geometry.txt')
+    1..15 | ForEach-Object { [void][NhkInput]::SetCursorPos($x0 - 17 * $_, $y0 - 10 * $_); Start-Sleep -Milliseconds 40 }
+    [NhkMouse]::mouse_event(0x0004, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 800; Shot '02-after-resize'
+    $after = New-Object NhkInput+RECT; [void][NhkInput]::GetWindowRect($hwnd, [ref]$after)
+    $client = $w.Current.BoundingRectangle
+    "frame_before=$($before.Left),$($before.Top),$($before.Right),$($before.Bottom) frame_after=$($after.Left),$($after.Top),$($after.Right),$($after.Bottom) client_after=$client" | Set-Content (Join-Path $script:CaseDir 'geometry.txt')
     Click-Element (Find-Element $w 'Close' 'ControlType.Button')
     Verdict 0 ([byte[]]@())
+    if (($after.Right - $after.Left) -ge ($before.Right - $before.Left) -or ($after.Bottom - $after.Top) -ge ($before.Bottom - $before.Top)) {
+        "s09-resize-geometry`tFAIL`t-`t-`twindow size did not shrink: $($before.Right-$before.Left)x$($before.Bottom-$before.Top) -> $($after.Right-$after.Left)x$($after.Bottom-$after.Top)" | Add-Content -Encoding UTF8 $Results
+    } else {
+        "s09-resize-geometry`tPASS`t-`t-`tframe $($before.Right-$before.Left)x$($before.Bottom-$before.Top) -> $($after.Right-$after.Left)x$($after.Bottom-$after.Top); document re-laid out (see 02-after-resize.png)" | Add-Content -Encoding UTF8 $Results
+    }
 }
 $C['s10_hostile'] = {
     $h = Fixture 'hostile.txt' (Utf8 "<script>alert(1)</script>`n<b>bold?</b> & `"q`" 's`nPříliš žluťoučký kůň 漢字 😀 עברית`n")
