@@ -1,27 +1,30 @@
 # CLI qualification — v0.1.1 against Core 1.0.2 (2026-11-15)
 
-**Status: qualified source checkpoint, not a published release.** Every gate below was executed
-against the pinned final Core 1.0.2 hosts on both platforms, from one CLI source tree, and
-passed: **132 records, 132 PASS, 0 FAIL, 0 BLOCKED**. Two things keep this from being a release:
-the CLI tree is uncommitted (`source_dirty: true` on commit `35b170a`) and the Core release
-itself was built from a dirty tree (`4f63398c…`, `source_dirty: true`). The archives must be
-rebuilt from committed sources before publication; nothing has been published. The results
-recorded for v0.1.0 (`9ec8b606`, Core 1.0.1) are not inherited.
+**Status: released as the prerelease
+[v0.1.1](https://github.com/nativehtmlkit/nativehtmlkit-cli/releases/tag/v0.1.1).** Every gate
+below was executed on both platforms from the clean commit
+`d00abb78a8a322daecdc7dbcf0ded17e6300e95c` against the pinned Core 1.0.2 hosts (Core built from
+its clean commit `8a09875cff58aa16b60573ffca24de4d611d60b3`), and passed:
+**132 records, 132 PASS, 0 FAIL, 0 BLOCKED**. Both archive manifests record that commit and
+`source_dirty: false`. It is a prerelease because Core's wire protocol v1 is still `1.0-rc`.
+The results recorded for v0.1.0 (`9ec8b606`, Core 1.0.1) are not inherited.
 
 | | Linux | Windows |
 |---|---|---|
 | Non-GUI gates | Debian 13 workstation, rustc 1.99.1 | Windows Server 2022 VM `winDEV` over SSH, rustc 1.100.0 |
 | GUI session | KDE Plasma 6.6.6 native Wayland, Ubuntu 26.04.1 (lab VM `linuxDEV`), ydotool/uinput, spectacle | interactive RDP desktop of dedicated user `nhk_gui` (winDEV), SendInput, `CopyFromScreen`; UI Automation only locates elements |
 | CLI source tree hash | `7b2929fde5fbbeeed28e7cbb50e99b324337a2c6ed0ff0a12e8949688e44f569` | same (verified on the VM through `SOURCE-IDENTITY.json`) |
-| Core host 1.0.2 (source tree `4f63398c948d8d674b7992e916b551042f646b7a`) | sha256 `702adafcbfe3c969cb12d0de5d37546727ee13b147c8fc866c7afa18aa741d2a` | sha256 `64d4502f27782bd17329ab6d560fc27b4e3d404b719ddd9bafc507d46d8638f4` |
+| Core host 1.0.2 (Core commit `8a09875c`) | sha256 `702adafcbfe3c969cb12d0de5d37546727ee13b147c8fc866c7afa18aa741d2a` | sha256 `64d4502f27782bd17329ab6d560fc27b4e3d404b719ddd9bafc507d46d8638f4` |
 | CLI binary | sha256 `e191d59df64b6a01c12ed9e7e702478019fa85279721ceb83c60989bfb0d4ad5` | sha256 `16834292b66602f8140f1041065a9a00d84e0bea15d86de1a2a26abb028f5f82` |
-| Archive | `nativehtmlkit-cli-v0.1.1-linux-x64.tar.gz` sha256 `c19e9827c48c42e6388d332d91e6b3179efcc6c645417ca37f52edd5286dffde` | `nativehtmlkit-cli-v0.1.1-windows-x64.zip` sha256 `db5223a5cee46ec41f6d746bdc02ad225c3fe54f1d483784589dd1971c2b4912` |
+| Archive | `nativehtmlkit-cli-v0.1.1-linux-x64.tar.gz` sha256 `094c2808c4844f82ed19e9e59a50591b739139eb15a3f0e22679a69ec41d10b0` | `nativehtmlkit-cli-v0.1.1-windows-x64.zip` sha256 `162c4c9f292151d8df9712aaf71d28e3c644749aed913e614ef323a90d717380` |
 | Records | **67: 67 PASS** | **65: 65 PASS** |
 
-Commands, durations, exit codes, logs and screenshots: `final2/results.json`, `final2/linux/` and
-`final2/windows/` under `nativehtmlkit-project/verification/2026-11-15-sdk/cli/` (local, not
-committed). Kept beside it: `final/` (the same hosts before the independent final review; superseded, with
-the frame-sequence recordings) and the development-host checkpoint (`linux/`, `windows/`).
+Commands, durations, exit codes, logs and screenshots: `release/results.json`, `release/linux/` and
+`release/windows/` under `nativehtmlkit-project/verification/2026-11-15-sdk/cli/` (local, not
+committed). Kept beside it, all superseded: `final2/` (the same sources and host binaries before they were
+committed; identical counts and identical CLI executables), `final/` (before the independent
+final review; holds the frame-sequence recordings) and the development-host checkpoint
+(`linux/`, `windows/`).
 
 ## Gates
 
@@ -43,7 +46,7 @@ the frame-sequence recordings) and the development-host checkpoint (`linux/`, `w
 | G7 | real host: 1870 × 16 accepted; 1871 × 16, 2000 × 32 and a 1.2 MB page refused as `input.invalid` before any host start | PASS | PASS |
 | G4 | real host: backend-side failure reports its cause, 10 of 10 runs (`rpc.rejected`, host code -32005) | PASS | PASS |
 | G4 | real host: trace output has no user data and no 64-hex credential | PASS | PASS |
-| G4 | real host frozen (SIGSTOP / `NtSuspendProcess`) → `error[host.unresponsive]`, exit 1, host killed | PASS (6.4 s) | PASS (6.3 s) |
+| G4 | real host frozen (SIGSTOP / `NtSuspendProcess`) → `error[host.unresponsive]`, exit 1, host killed | PASS | PASS |
 | G4 | real host killed → error, not Cancel | PASS | PASS |
 | G8 | package with the pinned host from the Core release directory; clean extraction; checksums; bundled-host headless session | PASS | PASS |
 | G6 | GUI suite from a clean extraction of the archive (below) | 48/48 PASS | 46/46 PASS |
@@ -88,6 +91,8 @@ this version. Frame-sequence recordings of open → resize → scroll → submit
 
 Kept with a note each, under the evidence directory:
 
+- `final2/` itself: 132 PASS from the then-uncommitted tree against the Core release built from
+  a dirty tree; superseded by `release/` (same tree hash, same executables, clean commits).
 - `final2/windows-run1-superseded/` (64 PASS, one FAIL in the then-new vertical-shrink case: the
   window had been cascaded below the screen edge and the button lay under the taskbar; the case
   now places the window on screen first) and `final2/linux-run1-superseded/` (67 PASS; rerun only
@@ -148,7 +153,6 @@ review (FR-R ids). Fixed in 0.1.1:
 - Not qualified: IME composition, DPI scaling above 100 %, multi-monitor, screen readers, real
   suspend/resume, PowerShell object pipelines beyond `ConvertTo-Json` text. The Linux harness
   depends on a 1280×800 screen and KWin's default window placement.
-- Cosmetic: `view`/`form` pages show a small page-level overflow scrollbar (both platforms).
 
 ## Rerun
 

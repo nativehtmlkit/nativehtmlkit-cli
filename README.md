@@ -192,3 +192,11 @@ machines, is `scripts/lab/qualify-linux.sh` and `scripts/lab/qualify-windows.sh`
 
 This repository is independent of Core (no crate/source dependency) and has no GitHub Actions.
 Releases are built and verified locally and uploaded to GitHub Releases only on explicit request.
+
+## Releases
+
+Current: [v0.1.1](https://github.com/nativehtmlkit/nativehtmlkit-cli/releases/tag/v0.1.1)
+(prerelease; Linux x86-64 `.tar.gz` and Windows x86-64 `.zip`, each bundling Core host 1.0.2).
+Extract the archive anywhere and run `nhk`; the CLI finds the host beside itself. Verify the
+download against the release's `SHA256SUMS`. What was qualified, and the known limitations, are
+in `docs/QUALIFICATION.md`.
