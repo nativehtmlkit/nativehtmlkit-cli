@@ -11,7 +11,7 @@ pub fn encode(data: &Data, outcome: &Outcome, format: OutputFormat) -> Result<Ve
             bytes.push(b'\n');
             return Ok(bytes);
         }
-        Outcome::Viewed => return Ok(Vec::new()),
+        Outcome::Viewed | Outcome::TimedOut => return Ok(Vec::new()),
     };
     let mut seen = HashSet::new();
     for &i in selected {
@@ -102,7 +102,7 @@ mod tests {
         assert_eq!(bytes, b"third\nfirst\n");
     }
     #[test]
-    fn json_array_has_no_stderr_content() {
+    fn json_selection_is_one_array_with_a_trailing_newline() {
         let data = parse("[{\"a\":1}]", InputFormat::Json, false).unwrap();
         assert_eq!(
             encode(

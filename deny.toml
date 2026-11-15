@@ -1,0 +1,30 @@
+# Dependency policy, checked offline by `cargo deny check` (scripts/qualify.py, gate G0).
+# Everything linked into the CLI must come from crates.io under a permissive licence.
+[graph]
+all-features = true
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "Unlicense",
+    "Zlib",
+    "Unicode-3.0",
+    "BSL-1.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
+
+[advisories]
+# The advisory database is only consulted when a local copy exists; qualification never
+# fetches from the network (`--offline`, `--disable-fetch`).

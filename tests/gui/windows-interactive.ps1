@@ -3,6 +3,8 @@
 # Must run INSIDE a logged-in interactive desktop (RDP or console), e.g. started from an
 # administrative SSH session with the original UI4ME helper:
 #   start_interactive.ps1 -UserName <desktop user> -ScriptPath <this file> -TimeoutSeconds 900
+# $Root\bin is a clean extraction of the release archive (nativehtmlkit.exe, nhk.exe,
+# nativehtmlkit-host.exe, examples\sample-form.html).
 # SSH alone has no desktop and is not GUI evidence. UI Automation is used ONLY to locate
 # elements; all actions are real OS input (SendInput mouse/keyboard) on the real window.
 # Each case records exact stdout bytes, stderr, exit code, screenshots and leftover
@@ -25,10 +27,21 @@ public static class NhkInput {
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
   [DllImport("kernel32.dll")] public static extern bool AttachConsole(uint pid);
   [DllImport("kernel32.dll")] public static extern bool FreeConsole();
   [DllImport("kernel32.dll")] public static extern bool SetConsoleCtrlHandler(IntPtr h, bool add);
   [DllImport("kernel32.dll")] public static extern bool GenerateConsoleCtrlEvent(uint ev, uint group);
+  [DllImport("user32.dll")] public static extern void mouse_event(uint f, int x, int y, uint d, IntPtr e);
+  [DllImport("kernel32.dll", SetLastError=true)] public static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+  [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr h);
+  [DllImport("ntdll.dll")] public static extern int NtSuspendProcess(IntPtr h);
+  // Freeze every thread of a process (PROCESS_SUSPEND_RESUME), as a debugger would.
+  public static int Suspend(uint pid) {
+    IntPtr h = OpenProcess(0x0800, false, pid);
+    if (h == IntPtr.Zero) return Marshal.GetLastWin32Error();
+    try { return NtSuspendProcess(h); } finally { CloseHandle(h); }
+  }
   public static void Click(int x, int y) {
     SetCursorPos(x, y); System.Threading.Thread.Sleep(80);
     var a = new INPUT[2];
@@ -130,9 +143,17 @@ function Dump-Tree($w) {
     }
     $rows | Set-Content -Encoding UTF8 (Join-Path $script:CaseDir 'uia-tree.tsv')
 }
-function Leftovers {
-    @(Get-Process nativehtmlkit, nhk, nativehtmlkit-host -ErrorAction SilentlyContinue | Where-Object { $_.SessionId -eq (Get-Process -Id $PID).SessionId }).Count
+# Only this suite's own processes count (started from $Bin, in this desktop session); other
+# NativeHTMLKit sessions on the shared desktop are none of this suite's business.
+function Session-Hosts {
+    $session = (Get-Process -Id $PID).SessionId
+    @(Get-Process nativehtmlkit, nhk, nativehtmlkit-host -ErrorAction SilentlyContinue | Where-Object { $_.SessionId -eq $session })
 }
+function Own-Processes { @(Session-Hosts | Where-Object { $_.Path -and $_.Path.StartsWith($Bin, [StringComparison]::OrdinalIgnoreCase) }) }
+function Foreign-Windows { @(Session-Hosts | Where-Object { $_.ProcessName -eq 'nativehtmlkit-host' -and -not ($_.Path -and $_.Path.StartsWith($Bin, [StringComparison]::OrdinalIgnoreCase)) }).Count }
+function Leftovers { (Own-Processes).Count }
+# Remove everything this suite started, so nothing of ours stays on the shared desktop.
+function Cleanup-Own { Own-Processes | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500 }
 function Verdict($wantRc, [byte[]]$wantOut) {
     if (-not $script:Proc.WaitForExit(30000)) { $rc = 'TIMEOUT'; try { $script:Proc.Kill() } catch {} } else { $rc = $script:Proc.ExitCode }
     Start-Sleep -Milliseconds 800
@@ -143,18 +164,26 @@ function Verdict($wantRc, [byte[]]$wantOut) {
     if ([Convert]::ToBase64String($got) -ne [Convert]::ToBase64String($wantOut)) { $ok = $false; $detail += 'stdout mismatch; ' }
     $left = if ($script:SkipLeftovers) { 0 } else { Leftovers }
     "leftover_processes=$left" | Set-Content (Join-Path $script:CaseDir 'cleanup.txt')
-    if ($left -ne 0) { $ok = $false; $detail += "leftovers=$left; " }
+    if ($left -ne 0) { $ok = $false; $detail += "leftovers=$left (removed); "; Cleanup-Own }
     ($got | ForEach-Object { '{0:x2}' -f $_ }) -join ' ' | Set-Content (Join-Path $script:CaseDir 'stdout.hex.txt')
     $res = if ($ok) { 'PASS' } else { 'FAIL' }
     if (-not $detail) { $detail = 'exact stdout, no leftovers' }
     "$script:Case`t$res`t$wantRc`t$rc`t$detail" | Add-Content -Encoding UTF8 $Results
     Log "$script:Case $res $detail"
 }
+# An additional assertion recorded as its own PASS/FAIL row.
+function Check($name, [bool]$ok, $detail) {
+    $res = if ($ok) { 'PASS' } else { 'FAIL' }
+    "$name`t$res`t-`t-`t$detail" | Add-Content -Encoding UTF8 $Results
+    Log "$name $res $detail"
+}
+function Stderr-Text { [IO.File]::ReadAllText((Join-Path $script:CaseDir 'stderr.txt'), [Text.Encoding]::UTF8) }
+$Sentinel = 'S3NTINEL-do-not-log-7f3a'
 function Guard([scriptblock]$body) {
     try { & $body } catch {
         Log "case $script:Case exception: $_"
         try { Shot 'zz-exception' } catch {}
-        Get-Process nhk, nativehtmlkit, nativehtmlkit-host -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Cleanup-Own
         "$script:Case`tFAIL`t-`t-`texception: $($_.Exception.Message -replace '\s+', ' ')" | Add-Content -Encoding UTF8 $Results
     }
 }
@@ -234,7 +263,7 @@ $C['s07_csv'] = {
     Verdict 0 (Utf8 "name,comment`nplain,`"has, comma`"`nquote,`"say `"`"hi`"`"`"`nnl,`"line1`nline2`"`n")
 }
 $C['s08_form'] = {
-    Start-Case 's08-form' $abc @('form', '--html', (Join-Path $Root 'sample-form.html'), '--title', 'NHK form')
+    Start-Case 's08-form' $abc @('form', '--html', (Join-Path $Bin 'examples\sample-form.html'), '--title', 'NHK form')
     $w = Find-Window 'NHK form'; Focus-Window $w; Dump-Tree $w; Shot '01-open'
     Click-Element (Find-Element $w 'Submit' 'ControlType.Button'); Start-Sleep -Milliseconds 500; Shot '02-required-error'
     $edit = $w.FindFirst([System.Windows.Automation.TreeScope]::Descendants,
@@ -261,11 +290,13 @@ $C['s09_resize'] = {
     $before = New-Object NhkInput+RECT; [void][NhkInput]::GetWindowRect($hwnd, [ref]$before)
     $sig = '[DllImport("user32.dll")] public static extern void mouse_event(uint f, int x, int y, uint d, IntPtr e);'
     if (-not ('NhkMouse' -as [type])) { Add-Type -Name NhkMouse -Namespace '' -MemberDefinition $sig }
-    # Grab the real frame's bottom-right sizing border (outside the client area) with the mouse.
-    $x0 = $before.Right - 4; $y0 = $before.Bottom - 4
+    # Grab the real frame's sizing border (outside the client area) with the mouse. Windows
+    # cascades new windows, so the bottom-right corner can lie below the screen edge; the
+    # top-left corner is always on screen. Dragging it inwards shrinks the window.
+    $x0 = $before.Left + 4; $y0 = $before.Top + 4
     [void][NhkInput]::SetCursorPos($x0, $y0); Start-Sleep -Milliseconds 300
     [NhkMouse]::mouse_event(0x0002, 0, 0, 0, [IntPtr]::Zero)
-    1..15 | ForEach-Object { [void][NhkInput]::SetCursorPos($x0 - 17 * $_, $y0 - 10 * $_); Start-Sleep -Milliseconds 40 }
+    1..15 | ForEach-Object { [void][NhkInput]::SetCursorPos($x0 + 17 * $_, $y0 + 10 * $_); Start-Sleep -Milliseconds 40 }
     [NhkMouse]::mouse_event(0x0004, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 800; Shot '02-after-resize'
     $after = New-Object NhkInput+RECT; [void][NhkInput]::GetWindowRect($hwnd, [ref]$after)
     $client = $w.Current.BoundingRectangle
@@ -277,6 +308,33 @@ $C['s09_resize'] = {
     } else {
         "s09-resize-geometry`tPASS`t-`t-`tframe $($before.Right-$before.Left)x$($before.Bottom-$before.Top) -> $($after.Right-$after.Left)x$($after.Bottom-$after.Top); document re-laid out (see 02-after-resize.png)" | Add-Content -Encoding UTF8 $Results
     }
+}
+$C['s09_resize_keeps_footer'] = {
+    # A long list in a window made 150 px shorter: the table must give up the height and the
+    # buttons must stay inside the window. (With viewport-height units the host kept the old
+    # layout and the footer left the window; see the project bug register.)
+    $rows60 = Fixture 'rows60.txt' (Utf8 ((1..60 | ForEach-Object { "row $_" }) -join "`n"))
+    Start-Case 's09-resize-keeps-footer' $rows60 @('select', '--multi', '--title', 'NHK footer')
+    $w = Find-Window 'NHK footer'; Focus-Window $w; Shot '01-before'
+    $hwnd = [IntPtr]$w.Current.NativeWindowHandle
+    # Test set-up, not user input: Windows cascades new windows and this one may reach below
+    # the screen edge and under the taskbar. Put it where the whole frame is visible.
+    [void][NhkInput]::SetWindowPos($hwnd, [IntPtr]::Zero, 60, 30, 0, 0, 0x0001 -bor 0x0004)   # NOSIZE | NOZORDER
+    Start-Sleep -Milliseconds 500
+    Click-Element (Find-Pick $w 2)
+    $before = New-Object NhkInput+RECT; [void][NhkInput]::GetWindowRect($hwnd, [ref]$before)
+    $x0 = [int](($before.Left + $before.Right) / 2); $y0 = $before.Bottom - 4      # bottom sizing border
+    [void][NhkInput]::SetCursorPos($x0, $y0); Start-Sleep -Milliseconds 300
+    [NhkInput]::mouse_event(0x0002, 0, 0, 0, [IntPtr]::Zero)
+    1..15 | ForEach-Object { [void][NhkInput]::SetCursorPos($x0, $y0 - 10 * $_); Start-Sleep -Milliseconds 40 }
+    [NhkInput]::mouse_event(0x0004, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 800; Shot '02-after-vertical-shrink'
+    $after = New-Object NhkInput+RECT; [void][NhkInput]::GetWindowRect($hwnd, [ref]$after)
+    $submit = Find-Element $w 'Submit selection' 'ControlType.Button'
+    $r = $submit.Current.BoundingRectangle
+    $inside = ($r.Y -ge $after.Top) -and (($r.Y + $r.Height) -le $after.Bottom)
+    Click-Element $submit
+    Verdict 0 (Utf8 "row 2`n")
+    Check 's09-resize-keeps-footer-geometry' ((($after.Bottom - $after.Top) -lt ($before.Bottom - $before.Top)) -and $inside) "frame height $($before.Bottom - $before.Top) -> $($after.Bottom - $after.Top); Submit button at y=$([int]$r.Y)..$([int]($r.Y + $r.Height)) inside the frame $($after.Top)..$($after.Bottom): $inside"
 }
 $C['s10_hostile'] = {
     $h = Fixture 'hostile.txt' (Utf8 "<script>alert(1)</script>`n<b>bold?</b> & `"q`" 's`nPříliš žluťoučký kůň 漢字 😀 עברית`n")
@@ -334,7 +392,171 @@ $C['s13_parallel'] = {
     Verdict 0 (Utf8 "alpha`n")
 }
 
-$names = if ($Cases.Count) { $Cases } else { @('s02_multi','s02_single','s03_cancel','s03_close','s03_empty_submit','s04_invalid','s05_bounds','s06_json','s07_csv','s08_form','s09_keyboard','s09_resize','s10_hostile','view','s11_kill','s11_ctrlc','s13_parallel') }
+$C['s09_keyboard_submit'] = {
+    # No mouse after the first focus click: Tab through row 2, row 3, Cancel to Submit,
+    # then Enter / Space activates the button.
+    foreach ($k in @(@('enter', 0x0D), @('space', 0x20))) {
+        Start-Case "s09-keyboard-submit-$($k[0])" $abc @('select', '--multi', '--title', "NHK kbd $($k[0])")
+        $w = Find-Window "NHK kbd $($k[0])"; Focus-Window $w
+        Click-Element (Find-Pick $w 1)
+        1..4 | ForEach-Object { [NhkInput]::Key(0x09); Start-Sleep -Milliseconds 120 }
+        Start-Sleep -Milliseconds 300; Shot '01-submit-focused'
+        [NhkInput]::Key([uint16]$k[1])
+        Verdict 0 (Utf8 "alpha`n")
+    }
+}
+$C['s15_slow_user'] = {
+    # The user thinks for three per-request deadlines; a healthy host is not a hung host.
+    Start-Case 's15-slow-user' $abc @('--diagnostics', 'debug', '--liveness-interval', '1', '--rpc-timeout', '3', 'select', '--multi', '--title', 'NHK slow')
+    $w = Find-Window 'NHK slow'; Focus-Window $w; Shot '01-open'
+    Start-Sleep -Seconds 9; Shot '02-still-open-after-idle'
+    Click-Element (Find-Pick $w 2); Click-Element (Find-Element $w 'Submit selection' 'ControlType.Button')
+    Verdict 0 (Utf8 "beta`n")
+    $err = Stderr-Text
+    $probes = ([regex]::Matches($err, '"event":"rpc\.completed"[^\n]*"operation":"host\.capabilities"')).Count
+    Check 's15-slow-user-probes' ($probes -ge 6 -and $err -notmatch 'error\[') "liveness probes answered while idle: $probes (need >= 6), no error line"
+}
+$C['s15_modal_hold'] = {
+    # Holding the title bar puts the window into the native modal move loop. The host must
+    # keep answering liveness probes, or a slow drag would be reported as a hang.
+    Start-Case 's15-modal-hold' $abc @('--diagnostics', 'debug', '--liveness-interval', '1', '--rpc-timeout', '3', 'select', '--multi', '--title', 'NHK hold')
+    $w = Find-Window 'NHK hold'; Focus-Window $w
+    $frame = New-Object NhkInput+RECT
+    [void][NhkInput]::GetWindowRect([IntPtr]$w.Current.NativeWindowHandle, [ref]$frame)
+    $x = [int](($frame.Left + $frame.Right) / 2); $y = $frame.Top + 16
+    [void][NhkInput]::SetCursorPos($x, $y); Start-Sleep -Milliseconds 300
+    [NhkInput]::mouse_event(0x0002, 0, 0, 0, [IntPtr]::Zero)
+    1..8 | ForEach-Object { [void][NhkInput]::SetCursorPos($x + 6 * $_, $y + 4 * $_); Start-Sleep -Seconds 1 }
+    Shot '01-held-in-move-loop'
+    [NhkInput]::mouse_event(0x0004, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 600
+    $moved = New-Object NhkInput+RECT
+    [void][NhkInput]::GetWindowRect([IntPtr]$w.Current.NativeWindowHandle, [ref]$moved)
+    Click-Element (Find-Pick $w 3); Click-Element (Find-Element $w 'Submit selection' 'ControlType.Button')
+    Verdict 0 (Utf8 "gamma`n")
+    $err = Stderr-Text
+    Check 's15-modal-hold-moved' ($moved.Left -ne $frame.Left -and $err -notmatch 'error\[') "window really was dragged for 8 s: left $($frame.Left) -> $($moved.Left); no error line"
+}
+$C['s15_resize_hold'] = {
+    # FR-R-10: a sizing border held for 8 s keeps the window in the native modal size loop,
+    # more than two per-request deadlines. A healthy host must not be reported as hung.
+    Start-Case 's15-resize-hold' $abc @('--diagnostics', 'debug', '--liveness-interval', '1', '--rpc-timeout', '3', 'select', '--multi', '--title', 'NHK grip')
+    $w = Find-Window 'NHK grip'; Focus-Window $w
+    $frame = New-Object NhkInput+RECT
+    [void][NhkInput]::GetWindowRect([IntPtr]$w.Current.NativeWindowHandle, [ref]$frame)
+    $x = $frame.Left + 4; $y = $frame.Top + 4
+    [void][NhkInput]::SetCursorPos($x, $y); Start-Sleep -Milliseconds 300
+    [NhkInput]::mouse_event(0x0002, 0, 0, 0, [IntPtr]::Zero)
+    [void][NhkInput]::SetCursorPos($x + 40, $y + 30); Start-Sleep -Seconds 8; Shot '01-held-in-size-loop'
+    [NhkInput]::mouse_event(0x0004, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 600
+    $sized = New-Object NhkInput+RECT
+    [void][NhkInput]::GetWindowRect([IntPtr]$w.Current.NativeWindowHandle, [ref]$sized)
+    Click-Element (Find-Pick $w 3); Click-Element (Find-Element $w 'Submit selection' 'ControlType.Button')
+    Verdict 0 (Utf8 "gamma`n")
+    Check 's15-resize-hold-sized' ($sized.Left -ne $frame.Left -and (Stderr-Text) -notmatch 'error\[') "sizing border really was held for 8 s: left $($frame.Left) -> $($sized.Left); no error line"
+}
+$C['s15_file_dialog'] = {
+    # FR-R-10: a native file dialog left open for 8 s (the user is browsing). The session
+    # must survive it and still deliver the form.
+    $html = Fixture 'file-form.html' (Utf8 '<form id="nhk-form"><p><label>Attachment <input type="file" name="attachment"></label></p><p><label>Note <input name="note" value="kept"></label></p></form>')
+    Start-Case 's15-file-dialog' $abc @('--diagnostics', 'debug', '--liveness-interval', '1', '--rpc-timeout', '3', 'form', '--html', $html, '--title', 'NHK dialog')
+    $w = Find-Window 'NHK dialog'; Focus-Window $w; Dump-Tree $w; Shot '01-open'
+    $picker = $null
+    foreach ($e in $w.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)) {
+        if ($e.Current.ControlType.ProgrammaticName -eq 'ControlType.Button' -and $e.Current.Name -notin @('Cancel', 'Submit')) { $picker = $e; break }
+    }
+    if (-not $picker) { throw 'no file-picker control found in the accessibility tree (see uia-tree.tsv)' }
+    Click-Element $picker
+    $dialogs = { @([System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.PropertyCondition]::new($UIA::ClassNameProperty, '#32770'))).Count }
+    $seen = 0; foreach ($i in 1..20) { $seen = & $dialogs; if ($seen) { break }; Start-Sleep -Milliseconds 250 }
+    Start-Sleep -Seconds 8; Shot '02-dialog-open-8s'
+    [NhkInput]::Key(0x1B); Start-Sleep -Milliseconds 800; Shot '03-dialog-dismissed'
+    $after = & $dialogs
+    Focus-Window $w
+    Click-Element (Find-Element $w 'Submit' 'ControlType.Button')
+    if (-not $script:Proc.WaitForExit(15000)) { try { $script:Proc.Kill() } catch {} }
+    $out = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes((Join-Path $script:CaseDir 'stdout.bin')))
+    $ok = $script:Proc.ExitCode -eq 0 -and $out.Contains('"name":"note","value":"kept"') -and (Stderr-Text) -notmatch 'error\['
+    Check 's15-file-dialog' ($ok -and $seen -gt 0 -and $after -eq 0 -and (Leftovers) -eq 0) "native dialog seen: $seen, open 8 s, dismissed (left: $after); exit $($script:Proc.ExitCode); form delivered with the note field: $($out.Contains('"note"')); no error line"
+    Cleanup-Own
+}
+$C['s16_hung_host'] = {
+    # Freeze the real host process while its window is open.
+    # Detection takes the probe interval plus twice the per-request deadline (1 s + 2 x 2 s).
+    Start-Case 's16-hung-host' $abc @('--liveness-interval', '1', '--rpc-timeout', '2', 'select', '--multi', '--title', 'NHK hung')
+    $w = Find-Window 'NHK hung'; Focus-Window $w; Shot '01-open'
+    $session = (Get-Process -Id $PID).SessionId
+    $hostProc = @(Get-Process nativehtmlkit-host | Where-Object { $_.SessionId -eq $session })[0]
+    $status = [NhkInput]::Suspend([uint32]$hostProc.Id)
+    $t0 = Get-Date
+    "host_pid=$($hostProc.Id) NtSuspendProcess=$status" | Set-Content (Join-Path $script:CaseDir 'hang.txt')
+    Start-Sleep -Milliseconds 1500; Shot '02-frozen-window'
+    Verdict 1 ([byte[]]@())
+    $seconds = [int]((Get-Date) - $t0).TotalSeconds
+    "seconds_until_cli_exit=$seconds" | Add-Content (Join-Path $script:CaseDir 'hang.txt')
+    Shot '03-window-gone'
+    Check 's16-hung-host-report' ($status -eq 0 -and (Stderr-Text) -match '(?m)^nativehtmlkit: error\[host\.unresponsive\]: ' -and $seconds -le 20) "host suspended (status $status); stderr names error[host.unresponsive]; CLI exited after $seconds s"
+}
+$C['s17_deadline'] = {
+    # 8 s leaves room for UI Automation to locate the window and a row before the deadline
+    # (--multi: Find-Pick looks for a check box first and would spend 10 s on a radio row).
+    Start-Case 's17-deadline' $abc @('--timeout', '8', 'select', '--multi', '--title', 'NHK deadline')
+    $w = Find-Window 'NHK deadline'; Focus-Window $w; Shot '01-open'
+    Click-Element (Find-Pick $w 1)        # a selection alone is not a decision
+    Verdict 124 ([byte[]]@())
+    Shot '02-closed-by-deadline'
+}
+$C['s18_diagnostics'] = {
+    # "Submit did nothing" support scenario: full trace, one session id across launcher,
+    # host and backend, and none of the user's data or the launch token in it.
+    $secret = Fixture 'secret.txt' (Utf8 "first $Sentinel`nsecond $Sentinel`nthird`n")
+    $env:NATIVEHTMLKIT_DIAGNOSTIC_SESSION_ID = 'gui-s18.windows'
+    try { Start-Case 's18-trace' $secret @('--diagnostics', 'trace', 'select', '--multi', '--title', "Trace $Sentinel") }
+    finally { Remove-Item Env:NATIVEHTMLKIT_DIAGNOSTIC_SESSION_ID }
+    $w = Find-Window "Trace $Sentinel"; Focus-Window $w; Shot '01-open'
+    Click-Element (Find-Element $w 'Submit selection' 'ControlType.Button'); Start-Sleep -Milliseconds 500; Shot '02-empty-submit-rejected'
+    Click-Element (Find-Pick $w 2); Click-Element (Find-Element $w 'Submit selection' 'ControlType.Button')
+    Verdict 0 (Utf8 "second $Sentinel`n")
+    $err = Stderr-Text
+    $lines = $err -split "`r?`n" | Where-Object { $_ }
+    Check 's18-trace-private' (-not $err.Contains($Sentinel) -and $err -notmatch '[0-9a-fA-F]{64}') "no user data and no 64-hex credential anywhere on stderr ($($lines.Count) lines)"
+    $cli = @($lines | Where-Object { $_.StartsWith('{"schema_version"') })
+    $foreign = @($cli | Where-Object { -not $_.Contains('"session_id":"gui-s18.windows"') }).Count
+    $roles = @('launcher', 'backend' | Where-Object { $r = $_; @($cli | Where-Object { $_.Contains("`"role`":`"$r`"") }).Count -gt 0 }).Count
+    $hostTagged = @($lines | Where-Object { $_.StartsWith('{"diagnostic_session_id":"gui-s18.windows"') }).Count
+    Check 's18-trace-correlated' ($foreign -eq 0 -and $roles -eq 2) "CLI records: $($cli.Count), with another session id: $foreign, roles seen: $roles/2"
+    # Core tags its own records with the id from 1.0.2 on; an older host cannot (BLOCKED).
+    $hostVersion = [version](((& (Join-Path $Bin 'nativehtmlkit-host.exe') --version) -split ' ')[1])
+    if ($hostTagged -gt 0) {
+        Check 's18-trace-host-correlated' $true "host $hostVersion tagged $hostTagged of its records with the same id"
+        # Each document.command the CLI completed is visible host-side under the same request id.
+        $ids = @([regex]::Matches($err, '"event":"rpc\.completed","request_id":"(nhk-\d+)","operation":"document\.command"') | ForEach-Object { $_.Groups[1].Value })
+        $missing = @($ids | Where-Object { -not ($err.Contains("`"event`":`"rpc.received`",`"method`":`"document.command`",`"id`":`"$_`"") -and $err.Contains("`"event`":`"rpc.completed`",`"method`":`"document.command`",`"id`":`"$_`"")) }).Count
+        Check 's18-trace-host-request-ids' ($ids.Count -ge 3 -and $missing -eq 0) "host trace shows rpc.received and rpc.completed for $($ids.Count) document.command request ids of the CLI (missing: $missing)"
+    }
+    elseif ($hostVersion -lt [version]'1.0.2') { "s18-trace-host-correlated`tBLOCKED`t-`t-`thost $hostVersion predates diagnostic_session_id tagging (Core 1.0.2)" | Add-Content -Encoding UTF8 $Results }
+    else { Check 's18-trace-host-correlated' $false "host $hostVersion wrote no record tagged with the session id" }
+    $explains = ($err -match '"event":"submit\.rejected"[^\n]*"reason":"empty_selection"') -and ($err -match '"event":"submit\.accepted"') -and ($err -match '"event":"rpc\.completed","request_id":"nhk-\d+","operation":"document\.command","duration_ms":\d')
+    Check 's18-trace-explains-submit' $explains 'trace shows the rejected and the accepted submit with request ids and durations'
+}
+
+$names = if ($Cases.Count) { $Cases } else { @('s02_multi','s02_single','s03_cancel','s03_close','s03_empty_submit','s04_invalid','s05_bounds','s06_json','s07_csv','s08_form','s09_keyboard','s09_keyboard_submit','s09_resize','s09_resize_keeps_footer','s10_hostile','view','s11_kill','s11_ctrlc','s13_parallel','s15_slow_user','s15_modal_hold','s15_resize_hold','s15_file_dialog','s16_hung_host','s17_deadline','s18_diagnostics') }
 Log "suite start session=$((Get-Process -Id $PID).SessionId) user=$env:USERNAME cases=$($names -join ',')"
-foreach ($n in $names) { Guard $C[$n] }
-Log 'suite end'
+# Pre-flight: the desktop is shared. Another NativeHTMLKit window would take our clicks, so
+# the suite does not start (BLOCKED, not FAIL) while one is open.
+foreach ($i in 1..6) { if ((Foreign-Windows) -eq 0) { break }; Start-Sleep -Seconds 5 }
+if ((Foreign-Windows) -ne 0) {
+    "suite-preflight`tBLOCKED`t-`t-`t$(Foreign-Windows) foreign NativeHTMLKit window(s) open on this desktop; suite not started" | Add-Content -Encoding UTF8 $Results
+    Log 'suite blocked by foreign windows'; exit 3
+}
+try {
+    foreach ($n in $names) { Guard $C[$n] }
+    Start-Sleep -Seconds 1
+    $left = Leftovers
+    Check 'suite-cleanup' ($left -eq 0) "own processes left at the end: $left (anything left was removed)"
+    $scope = if ($Cases.Count) { "partial run: $($names -join ',')" } else { "full suite: all $($names.Count) case groups ran to the end" }
+    "suite-complete`tPASS`t-`t-`t$scope" | Add-Content -Encoding UTF8 $Results
+} finally {
+    # Always, also when the suite is aborted: leave no window of ours behind.
+    Cleanup-Own
+    Log 'suite end'
+}

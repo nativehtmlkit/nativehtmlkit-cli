@@ -9,4 +9,4 @@ python3 scripts/check-repo.py
 cargo fmt --all -- --check
 cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked --all-targets
-cargo build --locked --release --bin nativehtmlkit
+python3 scripts/build-release.py

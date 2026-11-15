@@ -1,6 +1,6 @@
 [package]
 name = "nativehtmlkit-cli"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/nativehtmlkit/nativehtmlkit-cli"
@@ -11,6 +11,12 @@ publish = false
 name = "nativehtmlkit"
 path = "src/main.rs"
 
+# The launcher end-to-end suite is also the scripted host process the CLI launches, so it
+# needs its own `main` (see tests/launcher_e2e.rs).
+[[test]]
+name = "launcher_e2e"
+harness = false
+
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
@@ -18,7 +24,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order", "arbitrary_precision"] }
 csv = "1"
 tempfile = "3"
-ctrlc = "3.4"
 toml = "0.8"
 
 
@@ -28,8 +33,19 @@ lto = "thin"
 codegen-units = 1
 strip = "debuginfo"
 
-[target.'cfg(target_os = "linux")'.dependencies]
+[target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_JobObjects"] }
+ctrlc = "3.4"
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_JobObjects",
+    "Win32_System_Threading",
+] }
+
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Pipes"] }

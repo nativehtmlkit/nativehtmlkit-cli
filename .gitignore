@@ -3,3 +3,5 @@
 /verification/
 *.log
 .DS_Store
+/SOURCE-IDENTITY.json
+__pycache__/
