@@ -1,7 +1,37 @@
 # CLI qualification
 
-> **v0.1.2** (for Core 1.0.3, wire protocol v1 stable) is qualified from its release commit; its
-> results are recorded here after the release, as for v0.1.1. Everything below describes v0.1.1.
+## v0.1.2 against Core 1.0.3 (2026-11-16)
+
+**Status: released as v0.1.2** (full release; wire protocol v1 is public-stable 1.0 since Core 1.0.3):
+<https://github.com/nativehtmlkit/nativehtmlkit-cli/releases/tag/v0.1.2>.
+Qualified on both platforms from the clean commit `5d2c727b63de54331431995ab4d6c164ea12b0c9`
+(source tree hash `13646c2ab2a87b958c9a20730810e7254dfc9a0b06f340ad4eab691f8644f646`) against
+Core 1.0.3 built from its clean commit `d73dec36adbe1b1380f982388d13655750e607df`:
+**138 records, 138 PASS, 0 FAIL, 0 BLOCKED** (Linux 69, Windows 69).
+
+| | Linux | Windows |
+|---|---|---|
+| Core host 1.0.3 | `1cd4e9de701f3ef8d8b870b678765243f2365d69d7352c0543f171ff249c999f` | `15967208d2e20d208d69b97bba6f397056e28c57add126909a8734361ae8f8c8` |
+| CLI binary | `5bd01e05fc26ddce08ae9b4b7f9b3bcaef7b149370198d9c9d74394d180cff9f` | `b578177b78af10db0f4a6586d7f525fff2d04b103de3c339e09ada86ab07f73c` |
+| Archive | `nativehtmlkit-cli-v0.1.2-linux-x64.tar.gz` `7c55d7c346cb70db0a24e0f2795f4896fd0a36021b3815209e7e68e1f6496aa2` | `nativehtmlkit-cli-v0.1.2-windows-x64.zip` `e64c9eaeafc15450291c9bf22834dbd2024dd3d7d13657119beb439bc37f92d1` |
+| Unit / roundtrip / faults / e2e | 43 / 10 / 30 / 32 | 40 / 10 / 30 / 27 (5 POSIX-only ignored) |
+| Real host headless, pin, publish-gate simulation, packaging | 11 PASS | 11 PASS |
+| GUI suite from the extracted archive | 49/49 PASS (KDE Plasma 6.6.6 Wayland) | 49/49 PASS (interactive Windows Server 2022 desktop) |
+
+New since v0.1.1: Submit colliding with a window close is Cancel; dropped host notifications are
+disclosed; stderr lines are single writes; GUI cases for work-area placement (Windows), a
+vh-based user stylesheet after a vertical shrink, and no placeholder page in a new window
+(Core 1.0.3). Evidence: Project `verification/2026-11-16-full-release/cli/release/` (local).
+
+These archives were also the vehicle for the Project's native journeys (IME, display scaling,
+screen readers, multi-monitor) on both desktops; see the Project repository's
+`qualification/native-journeys/` and its qualification report for what completed.
+
+Known limitations: hang detection about 65 s with the defaults; a host stopped as a whole
+(SIGSTOP) while the CLI is killed is not cleaned up; Core defect NHK-CROSS-0010 (Orca does not
+announce value changes of a collapsed drop-down); the Submit/close collision is tested with a
+scripted host only; not qualified by this repository's own suite: mixed per-monitor scale on
+Windows, real suspend/resume; recordings not redone for 0.1.2.
 
 ## v0.1.1 against Core 1.0.2 (2026-11-15)
 
