@@ -5,3 +5,4 @@
 .DS_Store
 /SOURCE-IDENTITY.json
 __pycache__/
+!/examples/data/app.log

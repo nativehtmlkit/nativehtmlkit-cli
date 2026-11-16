@@ -1,0 +1,5 @@
+2026-11-16T09:00:01Z INFO  server listening on 127.0.0.1:8080
+2026-11-16T09:00:05Z INFO  GET /health 200 1ms
+2026-11-16T09:01:12Z WARN  slow query (812 ms): SELECT * FROM orders WHERE id = '<script>'
+2026-11-16T09:02:40Z ERROR upstream timeout after 30 s & retry 1/3
+2026-11-16T09:02:41Z INFO  retry succeeded
