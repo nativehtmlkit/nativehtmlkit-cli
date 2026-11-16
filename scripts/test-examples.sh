@@ -439,10 +439,9 @@ doc select-allow-empty 124 "124@2x1" "printf 'cache\nlogs\n' | nativehtmlkit sel
 doc view-csv 124 "124@7x7" "nativehtmlkit view --input-format csv --title 'Servers' < examples/data/servers.csv"
 doc view-ndjson 124 "124@3x7" "nativehtmlkit view --input-format ndjson < examples/data/app.ndjson"
 if command -v journalctl >/dev/null && journalctl -n 1 --no-pager >/dev/null 2>&1; then
-  doc view-journal 124 "124@*x1" "journalctl -n 500 --no-pager | tail -n 2000 | nativehtmlkit view --title 'Journal'   # entries can span lines"
   doc guide-journal-view-logs 124 "124@*x1" "journalctl -n 500 --no-pager | '$EX/view-logs.sh' -"
 else
-  begin doc-view-journal; skip "journalctl not readable here"
+  begin doc-guide-journal-view-logs; skip "journalctl not readable here"
 fi
 doc form-read-result 124 "124@0x1" "result=\$(nativehtmlkit form --html deploy.html) || exit; echo unreachable"
 stdout_is ''

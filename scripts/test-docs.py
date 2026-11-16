@@ -241,6 +241,7 @@ class Harness:
         p = subprocess.run(["bash", str(script)], cwd=fx / "repo/examples", env=env, stdin=subprocess.DEVNULL,
                            capture_output=True, timeout=180)
         calls = (case / "calls").read_text().splitlines() if (case / "calls").exists() else []
+        shutil.rmtree(fx, ignore_errors=True)       # the fixture copy is the bulk; keep the call records
         return p, calls, case
 
     def check_run(self, name, p, calls, case, want, calls_want, replayed=()):
@@ -494,9 +495,12 @@ def check_submit(cases: list[dict], work: Path, record) -> None:
         if m:
             seen.add(m.group(2))
             record(m.group(1), m.group(2), m.group(3))
+    if not seen and p.returncode != 0:
+        errors = [l for l in (p.stderr + p.stdout).splitlines() if l.startswith(("error", "warning: unused")) or "error[" in l]
+        record("FAIL", "submit-outputs build", f"cargo exit {p.returncode}: " + " | ".join(errors[:8])[:1500])
     for c in cases:
         if c["name"] not in seen:
-            record("FAIL", c["name"], "formatter check did not report this case: " + (p.stderr[-600:] or p.stdout[-600:]))
+            record("FAIL", c["name"], "formatter check did not report this case")
 
 
 def main() -> int:
