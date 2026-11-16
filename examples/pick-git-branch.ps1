@@ -34,7 +34,7 @@ try {
         default { exit $LASTEXITCODE }    # the CLI already printed "nativehtmlkit: error[...]"
     }
 
-    # -InputObject keeps a one-element JSON array an array in both PowerShell editions.
+    # [0] is the first record in both editions (5.1 returns the array as one object, 7 enumerates it).
     $branch = (ConvertFrom-Json -InputObject ($picked -join "`n"))[0].Branch
     git -C $Repository switch $branch
     exit $LASTEXITCODE

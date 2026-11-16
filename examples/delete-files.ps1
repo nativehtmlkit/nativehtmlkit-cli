@@ -44,7 +44,8 @@ try {
     }
     $json = $rows | ConvertTo-Json -Compress |
         Invoke-Picker select --multi --input-format json --output-format json --title "Files to delete in $(Split-Path -Leaf $Path)"
-    $picked = @(ConvertFrom-Json -InputObject $json)
+    # ForEach-Object unrolls the array: Windows PowerShell 5.1 returns a JSON array as one object.
+    $picked = @(ConvertFrom-Json -InputObject $json | ForEach-Object { $_ })
 
     $answer = "No, keep them", "Yes, delete $($picked.Count) file(s)" |
         Invoke-Picker select --title "Delete $($picked.Count) file(s)?"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # proj.sh - a small project-directory bookmark tool, built step by step in
-# docs/tutorials/build-a-project-picker.md.
+# docs/linux/tutorial.md.
 #
 # Teaches: one storage format (NDJSON) used directly as CLI input and output, a shared
 # wrapper for the exit contract, a generated and escaped form, multi-select with

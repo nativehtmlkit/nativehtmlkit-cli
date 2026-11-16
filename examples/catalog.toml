@@ -1,0 +1,172 @@
+# Machine-readable catalogue of the CLI examples (parity key: id).
+# linux = bash script, windows = PowerShell script (Windows PowerShell 5.1 and PowerShell 7),
+# both relative to this directory. Every file listed here is run by a tested block of
+# docs/linux (scripts/test-docs.py) or docs/windows (scripts/test-docs.ps1), and by
+# scripts/test-examples.sh / scripts/test-examples.ps1. language_specific = true marks an
+# example that exists for one OS only.
+
+[[example]]
+id = "pick-git-branch"
+title = "Pick a Git branch"
+summary = "Switch to a branch chosen from a table of recent branches with their last commit."
+teaches = ["JSON rows built from tab-separated tool output", "single choice", "reading a field of the chosen record"]
+linux = "pick-git-branch.sh"
+windows = "pick-git-branch.ps1"
+run_linux = "./pick-git-branch.sh [REPOSITORY]"
+run_windows = ".\\pick-git-branch.ps1 [-Repository PATH]"
+guide = "recipes/git-branch"
+language_specific = false
+
+[[example]]
+id = "delete-files"
+title = "Delete files with confirmation"
+summary = "Tick files, confirm in a second window, then delete exactly the ticked files."
+teaches = ["NUL-safe or literal paths", "a confirmation select", "nothing changes unless submitted"]
+linux = "delete-files.sh"
+windows = "delete-files.ps1"
+run_linux = "./delete-files.sh DIRECTORY [GLOB]"
+run_windows = ".\\delete-files.ps1 -Path DIRECTORY [-Filter GLOB] [-WhatIf]"
+guide = "recipes/delete-files"
+language_specific = false
+
+[[example]]
+id = "processes"
+title = "Choose processes to stop"
+summary = "Pick processes in a table and stop or signal exactly those."
+teaches = ["process lists as CSV or JSON", "CSV/JSON in, JSON out", "a second choice for the action"]
+linux = "kill-process.sh"
+windows = "stop-process.ps1"
+run_linux = "./kill-process.sh [NAME-FILTER]"
+run_windows = ".\\stop-process.ps1 [-Name PATTERN] [-WhatIf]"
+guide = "recipes/processes"
+language_specific = false
+
+[[example]]
+id = "pick-container"
+title = "Choose a Docker container"
+summary = "Pick a container, then show its logs, restart, stop it or open a shell."
+teaches = ["NDJSON from docker ps", "chained selections", "view for logs"]
+linux = "pick-container.sh"
+windows = "pick-container.ps1"
+run_linux = "./pick-container.sh"
+run_windows = ".\\pick-container.ps1"
+guide = "recipes/docker"
+language_specific = false
+
+[[example]]
+id = "pick-from-api"
+title = "Choose from JSON API output"
+summary = "Reshape a REST response, pick issues and print their URLs."
+teaches = ["flattening nested JSON", "records returned unchanged", "multi-select"]
+linux = "pick-from-api.sh"
+windows = "pick-from-api.ps1"
+run_linux = "./pick-from-api.sh data/issues.json"
+run_windows = ".\\pick-from-api.ps1 -Path data\\issues.json"
+guide = "recipes/json-api"
+language_specific = false
+
+[[example]]
+id = "csv-report"
+title = "Review and export CSV reports"
+summary = "View a CSV report, or export the rows you tick to a new CSV file."
+teaches = ["view", "CSV in and out", "writing output only after Submit"]
+linux = "csv-report.sh"
+windows = "csv-report.ps1"
+run_linux = "./csv-report.sh data/servers.csv [OUTPUT.csv]"
+run_windows = ".\\csv-report.ps1 -Report data\\servers.csv [-Output OUTPUT.csv]"
+guide = "recipes/csv-report"
+language_specific = false
+
+[[example]]
+id = "view-logs"
+title = "View logs"
+summary = "Show the end of a text or JSON-lines log (Windows: also the event log)."
+teaches = ["view for text and NDJSON", "staying inside the page limit"]
+linux = "view-logs.sh"
+windows = "view-logs.ps1"
+run_linux = "./view-logs.sh data/app.log"
+run_windows = ".\\view-logs.ps1 -Path data\\app.log"
+guide = "recipes/logs"
+language_specific = false
+
+[[example]]
+id = "search-selected"
+title = "Search only the files you tick"
+summary = "Tick files in a window, then search only those for a pattern."
+teaches = ["select --multi as a pipeline stage", "the CLI's own exit status inside a pipeline"]
+linux = "grep-selected.sh"
+windows = "search-selected.ps1"
+run_linux = "./grep-selected.sh PATTERN [DIRECTORY]"
+run_windows = ".\\search-selected.ps1 -Pattern PATTERN [-Path DIRECTORY]"
+guide = "recipes/pipelines"
+language_specific = false
+
+[[example]]
+id = "deploy-form"
+title = "A deployment form"
+summary = "Collect validated deployment parameters, confirm production, return them typed."
+teaches = ["generated and escaped --html", "Core form validation", "parsing entries", "a confirmation step"]
+linux = "deploy-form.sh"
+windows = "deploy-form.ps1"
+run_linux = "./deploy-form.sh [SERVICE...]"
+run_windows = ".\\deploy-form.ps1 [-Service NAME, ...]"
+guide = "recipes/deploy-form"
+language_specific = false
+
+[[example]]
+id = "pick-timezone"
+title = "Choose a time zone in a light theme"
+summary = "Pick one time zone from a long list in a window restyled with --css."
+teaches = ["--css themes via custom properties", "a single value from a long list"]
+linux = "pick-timezone.sh"
+windows = "pick-timezone.ps1"
+run_linux = "./pick-timezone.sh"
+run_windows = ".\\pick-timezone.ps1"
+guide = "recipes/timezone"
+language_specific = false
+
+[[example]]
+id = "pick-service"
+title = "Restart, stop or start Windows services"
+summary = "Pick Windows services, then the action to apply to them."
+teaches = ["Get-Service objects as JSON", "an action chosen in a second window", "-WhatIf"]
+windows = "pick-service.ps1"
+run_windows = ".\\pick-service.ps1 [-Name PATTERN] [-WhatIf]"
+guide = "recipes/services"
+language_specific = true
+
+[[example]]
+id = "project-picker"
+title = "Project picker (tutorial)"
+summary = "Bookmark project directories, pick one to jump to, list and remove them."
+teaches = ["select, form and view in one tool", "NDJSON as storage and CLI format", "one wrapper for the exit contract", "escaped generated forms", "--css"]
+linux = "tutorial/proj.sh"
+windows = "tutorial/proj.ps1"
+run_linux = "./tutorial/proj.sh [pick | add [DIR] | list | remove]"
+run_windows = ".\\tutorial\\proj.ps1 [pick | add [DIR] | list | remove]"
+guide = "tutorial"
+language_specific = false
+
+[[example]]
+id = "branch-picker-step1"
+title = "Branch picker, step 1 (tutorial)"
+summary = "Offer the local branches in a list and report the choice and exit status."
+teaches = ["lines input", "capturing stdout", "exit statuses 0, 2, 124"]
+linux = "tutorial-branch-picker/step1-pick.sh"
+windows = "tutorial-branch-picker/step1-pick.ps1"
+run_linux = "bash tutorial-branch-picker/step1-pick.sh [--timeout SECONDS]"
+run_windows = ".\\tutorial-branch-picker\\step1-pick.ps1 [-Timeout SECONDS]"
+guide = "tutorial-branch-picker"
+language_specific = false
+
+[[example]]
+id = "branch-picker"
+title = "git-pick: switch and delete branches (tutorial)"
+summary = "Switch to a branch from a table, or delete merged branches ticked in a list."
+teaches = ["TSV or JSON tables", "lines output", "--multi", "every exit status"]
+linux = "tutorial-branch-picker/git-pick.sh"
+windows = "tutorial-branch-picker/git-pick.ps1"
+run_linux = "bash tutorial-branch-picker/git-pick.sh [--delete-merged | --print] [--timeout SECONDS]"
+run_windows = ".\\tutorial-branch-picker\\git-pick.ps1 [-DeleteMerged | -Print] [-Timeout SECONDS]"
+guide = "tutorial-branch-picker"
+language_specific = false

@@ -26,8 +26,9 @@ try {
         Select-Object Name, DisplayName, @{ n = 'Status'; e = { "$($_.Status)" } }, @{ n = 'Start type'; e = { "$($_.StartType)" } })
     if ($rows.Count -eq 0) { Write-Host "No service matches $Name."; exit 0 }
 
+    # ForEach-Object unrolls the array: Windows PowerShell 5.1 returns a JSON array as one object.
     $picked = @(ConvertFrom-Json -InputObject ($rows | ConvertTo-Json -Compress |
-        Invoke-Picker select --multi --input-format json --output-format json --title 'Services'))
+        Invoke-Picker select --multi --input-format json --output-format json --title 'Services') | ForEach-Object { $_ })
     $action = 'Restart', 'Stop', 'Start' | Invoke-Picker select --title "Action for $($picked.Count) service(s)"
 
     foreach ($service in $picked) {

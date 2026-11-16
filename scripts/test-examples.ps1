@@ -136,6 +136,7 @@ function Case {
         [IO.File]::WriteAllText("$dir/replay/$($i + 1).rc", [string] $Replay[$i][0], $Utf8)
         [IO.File]::WriteAllText("$dir/replay/$($i + 1).out", [string] $Replay[$i][1], $Utf8)
     }
+    [IO.File]::AppendAllText("$Work/invoked", $Command + "`n")
     $r = Invoke-Child $Command $dir
     [IO.File]::WriteAllText("$dir/stdout", $r.Out, $Utf8); [IO.File]::WriteAllText("$dir/stderr", $r.Err, $Utf8)
     $lines = @(if (Test-Path "$dir/calls") { Get-Content "$dir/calls" })
@@ -203,6 +204,12 @@ Case delete-files-replay-confirm 0 '124@3x4 124@2x1' "& ./delete-files.ps1 -Path
 $files = New-Files
 Case delete-files-replay-whatif 0 '124@3x4 124@2x1' "& ./delete-files.ps1 -Path $(Q $files) -WhatIf" -Replay @(@(0, $pickA), @(0, 'Yes, delete 1 file(s)')) -Check { (Count-Files $files) -eq 3 } -CheckName '-WhatIf deleted nothing'
 Case delete-files-replay-keep 0 '124@3x4 124@2x1' "& ./delete-files.ps1 -Path $(Q $files)" -Replay @(@(0, $pickA), @(0, 'No, keep them')) -Check { (Count-Files $files) -eq 3 } -CheckName 'nothing deleted'
+$files = New-Files
+$pickAB = '[' + (ConvertTo-Json -Compress -InputObject ([pscustomobject]@{ Name = 'a b.txt'; 'Size (KiB)' = 1; Modified = '2026-11-16 09:00'; Path = (Join-Path $files 'a b.txt') })) + ',' +
+    (ConvertTo-Json -Compress -InputObject ([pscustomobject]@{ Name = "it's [quoted].log"; 'Size (KiB)' = 1; Modified = '2026-11-16 09:00'; Path = (Join-Path $files "it's [quoted].log") })) + ']'
+Case delete-files-replay-confirm-two 0 '124@3x4 124@2x1' "& ./delete-files.ps1 -Path $(Q $files)" -Replay @(@(0, $pickAB), @(0, 'Yes, delete 2 file(s)')) -Check {
+    param($r) (Count-Files $files) -eq 1 -and ([regex]::Matches($r.Out, '(?m)^deleted ')).Count -eq 2 } -CheckName 'two files deleted, one message each'
+$files = New-Files
 Case delete-files-replay-cancel 2 '124@3x4' "& ./delete-files.ps1 -Path $(Q $files)" -Replay @(, @(2, '')) -Check { (Count-Files $files) -eq 3 } -CheckName 'nothing deleted'
 
 # A uniquely named long-running process of our own.
@@ -271,7 +278,74 @@ $unicode = '$name = "P$([char]0x0159)$([char]0x00ED)li$([char]0x0161) $([char]0x
 Case encoding-utf8-no-bom 124 '124@1x2' "$unicode; `$OutputEncoding = [System.Text.UTF8Encoding]::new(`$false); [pscustomobject]@{ name = `$name; n = 1 } | ConvertTo-Json -Compress | nativehtmlkit select --input-format json"
 Case encoding-pipeline-objects 124 '124@2x2' "`$OutputEncoding = [System.Text.UTF8Encoding]::new(`$false); Get-ChildItem -LiteralPath $(Q $Examples) -Filter 'pick-git-branch.*' | Select-Object Name, Length | ConvertTo-Json | nativehtmlkit select --input-format json"
 
-# ---- documentation snippets (README.md, docs/), run as written ----------------------------
+# ---- examples added for the documentation sections -----------------------------------------
+$grepDir = Join-Path $fx 'grep'
+New-Item -ItemType Directory -Path $grepDir | Out-Null
+[IO.File]::WriteAllText((Join-Path $grepDir 'one.txt'), "alpha TODO`n")
+[IO.File]::WriteAllText((Join-Path $grepDir 'two.txt'), "nothing here`n")
+Case search-selected-headless 124 '124@2x1' "& ./search-selected.ps1 -Pattern TODO -Path $(Q $grepDir)"
+Case search-selected-replay 0 '124@2x1' "& ./search-selected.ps1 -Pattern TODO -Path $(Q $grepDir)" -Replay @(, @(0, "one.txt`ntwo.txt")) -Check {
+    param($r) $r.Out.Trim() -eq 'one.txt:1:alpha TODO' } -CheckName 'only the chosen files were searched'
+Case search-selected-replay-no-match 1 '124@2x1' "& ./search-selected.ps1 -Pattern TODO -Path $(Q $grepDir)" -Replay @(, @(0, 'two.txt'))
+Case search-selected-replay-cancel 2 '124@2x1' "& ./search-selected.ps1 -Pattern TODO -Path $(Q $grepDir)" -Replay @(, @(2, ''))
+
+Case pick-timezone-headless 124 '124@*x3' "& ./pick-timezone.ps1"
+Case pick-timezone-replay 0 '124@*x3' "& ./pick-timezone.ps1" -Replay @(, @(0, '[{"Id":"Tokyo Standard Time","Offset":"+09:00","Name":"(UTC+09:00) Osaka, Sapporo, Tokyo"}]')) -Check {
+    param($r) $r.Out.Trim() -eq 'Tokyo Standard Time' } -CheckName 'prints the chosen id'
+
+$projStore = Join-Path $fx 'proj.ndjson'
+$projDir = Join-Path $fx 'projdir'
+New-Item -ItemType Directory -Path $projDir | Out-Null
+$inProj = "`$env:PROJ_FILE = $(Q $projStore)"
+Case proj-pick-empty-store 1 '' "$inProj; & ./tutorial/proj.ps1 pick"
+Case proj-add-headless 124 '124@0x1' "$inProj; & ./tutorial/proj.ps1 add $(Q $projDir)" -Check { -not (Test-Path -LiteralPath $projStore) } -CheckName 'store not created'
+$addEntries = ConvertTo-Json -Compress -InputObject ([pscustomobject]@{ entries = @(
+    [pscustomobject]@{ kind = 'text'; name = 'name'; value = 'proj <dir>' },
+    [pscustomobject]@{ kind = 'text'; name = 'path'; value = $projDir },
+    [pscustomobject]@{ kind = 'text'; name = 'tags'; value = 'demo' }) })
+Case proj-add-replay 0 '124@0x1' "$inProj; & ./tutorial/proj.ps1 add $(Q $projDir)" -Replay @(, @(0, $addEntries)) -Check {
+    $rec = ConvertFrom-Json -InputObject ([IO.File]::ReadAllText($projStore)); $rec.name -eq 'proj <dir>' -and $rec.path -eq $projDir -and $rec.added.Length -eq 10 } -CheckName 'one record stored'
+Case proj-add-duplicate 1 '124@0x1' "$inProj; & ./tutorial/proj.ps1 add $(Q $projDir)" -Replay @(, @(0, $addEntries)) -Check {
+    @([IO.File]::ReadAllLines($projStore) | Where-Object { $_ }).Count -eq 1 } -CheckName 'still one record'
+Case proj-pick-headless 124 '124@1x4' "$inProj; & ./tutorial/proj.ps1 pick"
+$stored = @([IO.File]::ReadAllLines($projStore) | Where-Object { $_ })[0]
+Case proj-pick-replay 0 '124@1x4' "$inProj; & ./tutorial/proj.ps1 pick" -Replay @(, @(0, "[$stored]")) -Check {
+    param($r) $r.Out.Trim() -eq $projDir } -CheckName 'prints the chosen path'
+Case proj-list 124 '124@1x4' "$inProj; & ./tutorial/proj.ps1 list"
+Case proj-remove-cancel 2 '124@1x4' "$inProj; & ./tutorial/proj.ps1 remove" -Replay @(, @(2, '')) -Check {
+    @([IO.File]::ReadAllLines($projStore) | Where-Object { $_ }).Count -eq 1 } -CheckName 'store unchanged'
+Case proj-remove-replay 0 '124@1x4 124@2x1' "$inProj; & ./tutorial/proj.ps1 remove" -Replay @(@(0, $stored), @(0, 'Remove 1 project(s)')) -Check {
+    @([IO.File]::ReadAllLines($projStore) | Where-Object { $_ }).Count -eq 0 } -CheckName 'record removed'
+
+if ($haveGit) {
+    $bp = Join-Path $fx 'bprepo'
+    & { $ErrorActionPreference = 'Continue'
+        git init -q $bp 2>&1 | Out-Null
+        git -C $bp checkout -q -b main 2>&1 | Out-Null
+        $env:GIT_COMMITTER_DATE = '2026-11-10T09:00:00Z'; git -C $bp commit -q --allow-empty -m 'initial commit' 2>&1 | Out-Null
+        git -C $bp branch feature/login 2>&1 | Out-Null
+        git -C $bp switch -q -c fix/typo 2>&1 | Out-Null
+        [IO.File]::WriteAllText("$fx/msg.txt", 'Fix the "quick start" typo')   # -F: 5.1 does not escape quotes
+        $env:GIT_COMMITTER_DATE = '2026-11-12T09:00:00Z'; git -C $bp commit -q --allow-empty -F "$fx/msg.txt" 2>&1 | Out-Null
+        git -C $bp switch -q main 2>&1 | Out-Null
+        $env:GIT_COMMITTER_DATE = '2026-11-14T09:00:00Z'; git -C $bp merge -q --no-ff -m 'Merge fix/typo' fix/typo 2>&1 | Out-Null
+        Remove-Item Env:GIT_COMMITTER_DATE }
+    $inBp = "Set-Location $(Q $bp)"
+    $step1 = Q (Join-Path $Examples 'tutorial-branch-picker/step1-pick.ps1')
+    $gitPick = Q (Join-Path $Examples 'tutorial-branch-picker/git-pick.ps1')
+    Case branch-picker-step1-headless 124 '124@3x1' "$inBp; & $step1 -Timeout 30"
+    Case branch-picker-step1-replay 0 '124@3x1' "$inBp; & $step1" -Replay @(, @(0, 'fix/typo')) -Check { param($r) $r.Out.Trim() -eq 'You chose: fix/typo' } -CheckName 'reports the choice'
+    Case branch-picker-print 0 '' "$inBp; & $gitPick -Print" -Check { param($r) $r.Out.Contains('feature/login') -and $r.Out.Contains('fix/typo') } -CheckName 'table printed'
+    Case branch-picker-switch-headless 124 '124@3x3' "$inBp; & $gitPick -Timeout 20" -Check { (git -C $bp branch --show-current) -eq 'main' } -CheckName 'still on main'
+    Case branch-picker-switch-replay 0 '124@3x3' "$inBp; & $gitPick" -Replay @(, @(0, '[{"branch":"feature/login","updated":"6 days ago","last commit":"initial commit"}]')) -Check {
+        (git -C $bp branch --show-current) -eq 'feature/login' } -CheckName 'switched to feature/login'
+    & { $ErrorActionPreference = 'Continue'; git -C $bp switch -q main 2>&1 | Out-Null }
+    Case branch-picker-delete-replay 0 '124@2x3' "$inBp; & $gitPick -DeleteMerged" -Replay @(, @(0, '[{"branch":"fix/typo","updated":"4 days ago","last commit":"x"}]')) -Check {
+        @(git -C $bp branch --format='%(refname:short)') -join ',' -eq 'feature/login,main' } -CheckName 'fix/typo deleted'
+    Case branch-picker-delete-cancel 2 '124@1x3' "$inBp; & $gitPick -DeleteMerged" -Replay @(, @(2, ''))
+} else { Record SKIP branch-picker 'git not available' }
+
+# ---- documentation snippets (README.md, the reference, earlier guides), run as written ----------------------------
 $snip = Join-Path $fx 'snip'
 New-Item -ItemType Directory -Path $snip | Out-Null
 Copy-Item (Join-Path $Examples 'data/app.log') (Join-Path $snip 'app.log')
@@ -318,13 +392,18 @@ Case doc-guide-view-logs-text 124 '124@5x1' "$in; Get-Content -LiteralPath .\app
 Case doc-windows-readback 124 '124@2x2' "$in; `$rows = @([pscustomobject]@{ Name = 'a'; N = 1 }, [pscustomobject]@{ Name = 'b'; N = 2 })
 `$json = `$rows | ConvertTo-Json -Compress | nativehtmlkit select --multi --input-format json --output-format json
 if (`$LASTEXITCODE -ne 0) { exit `$LASTEXITCODE }
-`$picked = @(ConvertFrom-Json -InputObject (`$json -join `"``n`"))
+`$picked = @(ConvertFrom-Json -InputObject (`$json -join `"``n`") | ForEach-Object { `$_ })
 `$picked | ForEach-Object { `$_.Name }"
 Case doc-windows-readback-replay 0 '124@2x2' "$in; `$rows = @([pscustomobject]@{ Name = 'a'; N = 1 }, [pscustomobject]@{ Name = 'b'; N = 2 })
 `$json = `$rows | ConvertTo-Json -Compress | nativehtmlkit select --multi --input-format json --output-format json
 if (`$LASTEXITCODE -ne 0) { exit `$LASTEXITCODE }
-`$picked = @(ConvertFrom-Json -InputObject (`$json -join `"``n`"))
+`$picked = @(ConvertFrom-Json -InputObject (`$json -join `"``n`") | ForEach-Object { `$_ })
 `$picked | ForEach-Object { `$_.Name }" -Replay @(, @(0, '[{"Name":"b","N":2}]')) -Check { param($r) $r.Out.Trim() -eq 'b' } -CheckName 'one chosen object read back'
+Case doc-windows-readback-two 0 '124@2x2' "$in; `$rows = @([pscustomobject]@{ Name = 'a'; N = 1 }, [pscustomobject]@{ Name = 'b'; N = 2 })
+`$json = `$rows | ConvertTo-Json -Compress | nativehtmlkit select --multi --input-format json --output-format json
+if (`$LASTEXITCODE -ne 0) { exit `$LASTEXITCODE }
+`$picked = @(ConvertFrom-Json -InputObject (`$json -join `"``n`") | ForEach-Object { `$_ })
+`"`$(`$picked.Count): `$((`$picked | ForEach-Object { `$_.Name }) -join ',')`"" -Replay @(, @(0, '[{"Name":"a","N":1},{"Name":"b","N":2}]')) -Check { param($r) $r.Out.Trim() -eq '2: a,b' } -CheckName 'two chosen objects read back as two'
 Case doc-form-generate 124 '124@0x1' "$in; function Enc([string] `$s) { [System.Net.WebUtility]::HtmlEncode(`$s) }
 `$name = 'a <b> & `"c`"'
 `$path = Join-Path (Get-Location) 'gen.html'
@@ -352,6 +431,19 @@ if ($IsWin -and ((& $Shell -NoProfile -Command '$PSVersionTable.PSVersion.Major'
     Case doc-windows-utf8-bom-breaks-json 1 '1@none' "$in; `$OutputEncoding = [Text.Encoding]::UTF8; '[1]' | nativehtmlkit select --input-format json; exit `$LASTEXITCODE" -Check {
         param($r, $d) (Get-Content -LiteralPath "$d/1.err") -match 'invalid JSON input: expected value at line 1 column 1' } -CheckName 'BOM rejected as documented'
     Case doc-windows-default-encoding 0 '' "`"`$(`$OutputEncoding.WebName)`"" -Check { param($r) $r.Out.Trim() -eq 'us-ascii' } -CheckName 'Windows PowerShell 5.1 sends us-ascii by default'
+}
+
+# ---- catalog coverage: every windows example of examples/catalog.toml was run -------------
+if (-not $Filter) {
+    $invoked = [IO.File]::ReadAllText("$Work/invoked")
+    foreach ($line in [IO.File]::ReadAllLines((Join-Path $Examples 'catalog.toml'))) {
+        $m = [regex]::Match($line, '^windows\s*=\s*"([^"]+)"')
+        if (-not $m.Success) { continue }
+        $f = $m.Groups[1].Value
+        if ($f -eq 'pick-service.ps1' -and -not $IsWin) { Record SKIP "catalog $f" 'Windows only'; continue }
+        if ($invoked -match ('(?<![\w.-])' + [regex]::Escape($f).Replace('/', '[\\/]') + "(?![\w.-])")) { Record PASS "catalog $f" 'run by a case' }
+        else { Record FAIL "catalog $f" 'no case runs it' }
+    }
 }
 
 # ---- leftovers ---------------------------------------------------------------------------

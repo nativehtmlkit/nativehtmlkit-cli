@@ -124,6 +124,7 @@ replay() {  # replay CALL-NUMBER EXIT-STATUS STDOUT-TEXT
 go() {
   ((ACTIVE)) || return 0
   local want=$1 calls=$2 rc; shift 2
+  printf '%s\n' "$*" >>"$WORK/invoked"
   (cd "$EX" && "$@") >"$CDIR/stdout" 2>"$CDIR/stderr" </dev/null
   rc=$?
   local got; got=$(cut -d' ' -f1 "$CDIR/calls" 2>/dev/null | paste -sd' ')
@@ -370,7 +371,41 @@ replay 1 2 ''
 go 2 "124@1x4" ./tutorial/proj.sh remove
 check "store unchanged" bash -c '[[ $(wc -l <"$1") == 1 ]]' _ "$PROJ_FILE"
 
-# ---- documentation snippets (README.md, docs/) ---------------------------------------------
+# ---- branch picker tutorial (examples/tutorial-branch-picker) -----------------------------
+BP=$FIX/bprepo
+git init -q -b main "$BP"
+GIT_COMMITTER_DATE=2026-11-10T09:00:00Z git -C "$BP" commit -q --allow-empty -m 'initial commit'
+git -C "$BP" branch feature/login
+git -C "$BP" switch -q -c fix/typo
+GIT_COMMITTER_DATE=2026-11-12T09:00:00Z git -C "$BP" commit -q --allow-empty -m 'Fix the "quick start" typo'
+git -C "$BP" switch -q main
+GIT_COMMITTER_DATE=2026-11-14T09:00:00Z git -C "$BP" merge -q --no-ff -m 'Merge fix/typo' fix/typo
+begin branch-picker-step1-headless
+go 124 "124@3x1" bash -c "cd '$BP' && bash '$EX/tutorial-branch-picker/step1-pick.sh' --timeout 30"
+begin branch-picker-step1-replay
+replay 1 0 'fix/typo\n'
+go 0 "124@3x1" bash -c "cd '$BP' && bash '$EX/tutorial-branch-picker/step1-pick.sh'"
+stdout_is 'You chose: fix/typo\n'
+begin branch-picker-print
+go 0 "" bash -c "cd '$BP' && bash '$EX/tutorial-branch-picker/git-pick.sh' --print"
+check "header and three branches, newest first" bash -c '[[ $(cut -f1 "$1" | paste -sd,) == "branch,main,fix/typo,feature/login" ]]' _ "$CDIR/stdout"
+begin branch-picker-switch-headless
+go 124 "124@3x3" bash -c "cd '$BP' && bash '$EX/tutorial-branch-picker/git-pick.sh' --timeout 20"
+check "still on main" test "$(git -C "$BP" branch --show-current)" = main
+begin branch-picker-switch-replay
+replay 1 0 'feature/login\t4 days ago\tinitial commit\n'
+go 0 "124@3x3" bash -c "cd '$BP' && bash '$EX/tutorial-branch-picker/git-pick.sh'"
+check "switched to feature/login" test "$(git -C "$BP" branch --show-current)" = feature/login
+git -C "$BP" switch -q main
+begin branch-picker-delete-replay
+replay 1 0 'fix/typo\t2 days ago\tFix the '"'"'quick start'"'"' typo\n'
+go 0 "124@2x3" bash -c "cd '$BP' && bash '$EX/tutorial-branch-picker/git-pick.sh' --delete-merged"
+check "fix/typo deleted, feature/login kept" bash -c '! git -C "$1" rev-parse -q --verify refs/heads/fix/typo >/dev/null && git -C "$1" rev-parse -q --verify refs/heads/feature/login >/dev/null' _ "$BP"
+begin branch-picker-delete-cancel
+replay 1 2 ''
+go 2 "124@1x3" bash -c "cd '$BP' && bash '$EX/tutorial-branch-picker/git-pick.sh' --delete-merged"
+
+# ---- documentation snippets (README.md, the reference, earlier guides) ---------------------------------------------
 # Each runs as written in the documents, in a directory holding the files they name.
 SNIP=$FIX/snip
 mkdir -p "$SNIP"
@@ -633,6 +668,17 @@ if ((ACTIVE)); then
     if [[ $rc == "$want" && ! -s $CDIR/$sig.out ]]; then record PASS "$CASE: SIG$sig" "exit $rc, no stdout"
     else record FAIL "$CASE: SIG$sig" "exit $rc, want $want"; fi
   done
+fi
+
+# ---- catalog coverage: every linux example of examples/catalog.toml was run ---------------
+if [[ -z $FILTER ]]; then
+  while IFS= read -r f; do
+    if grep -qE "(^|[ /'])(\./)?$(printf '%s' "$f" | sed 's/[.]/\\./g')( |'|\$)" "$WORK/invoked"; then
+      record PASS "catalog $f" "run by a case"
+    else
+      record FAIL "catalog $f" "no case runs it"
+    fi
+  done < <(python3 -I -c 'import sys,tomllib; [print(e["linux"]) for e in tomllib.load(open(sys.argv[1],"rb"))["example"] if "linux" in e]' "$EX/catalog.toml")
 fi
 
 # ---- cleanup checks ----------------------------------------------------------------------

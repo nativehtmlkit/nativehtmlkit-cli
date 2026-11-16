@@ -27,7 +27,8 @@ try {
         nativehtmlkit select --multi --input-format json --output-format json --title 'Processes to stop'
     if ($LASTEXITCODE -ne 0) { Write-Warning 'Nothing stopped.'; exit $LASTEXITCODE }
 
-    foreach ($process in @(ConvertFrom-Json -InputObject ($json -join "`n"))) {
+    # ForEach-Object unrolls the array: Windows PowerShell 5.1 returns a JSON array as one object.
+    foreach ($process in @(ConvertFrom-Json -InputObject ($json -join "`n") | ForEach-Object { $_ })) {
         if ($PSCmdlet.ShouldProcess("$($process.ProcessName) ($($process.Id))", 'Stop process')) {
             Stop-Process -Id $process.Id
         }
