@@ -37,6 +37,8 @@ of the command. When it passes:
 
 A submit that was accepted before the deadline wins; nothing is written after the deadline.
 
+<a id="host-watchdogs"></a>
+
 ## Host watchdogs: `--rpc-timeout`, `--liveness-interval`, `--startup-timeout`
 
 These bound the **host**, not the person. They exist so a pipeline never hangs on a host

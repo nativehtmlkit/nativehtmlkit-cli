@@ -158,7 +158,7 @@ view 1x1
 
 The host watchdogs (defaults 30, 5 and 15 seconds). They limit how long the CLI waits for
 a *host* that stopped working, never the person reading
-([global options](../../reference/global-options.md#host-watchdogs---rpc-timeout---liveness-interval---startup-timeout)):
+([global options](../../reference/global-options.md#host-watchdogs)):
 
 <!-- test: exit=124 calls="124@5x1" -->
 ```powershell

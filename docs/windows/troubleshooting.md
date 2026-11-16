@@ -153,7 +153,7 @@ the host accepts 1048576 (1 MiB)
 ## The script stops at the CLI
 
 That is by design: the window waits for the person. Add `--timeout` for unattended runs
-([exit codes and scripting](exit-codes-and-scripting.md#--timeout-is-for-people-not-for-hangs)).
+([exit codes and scripting](exit-codes-and-scripting.md#timeout-is-for-people)).
 
 ## Get a log to report a problem
 

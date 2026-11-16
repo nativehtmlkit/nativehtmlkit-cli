@@ -197,6 +197,8 @@ $target = Join-Path (Get-Location) 'out.csv'
 out.csv exists: False
 ```
 
+<a id="timeout-is-for-people"></a>
+
 ## `--timeout` is for people, not for hangs
 
 Without `--timeout` a window waits as long as the person needs. Add it when an unattended

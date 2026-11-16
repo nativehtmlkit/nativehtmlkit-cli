@@ -185,6 +185,8 @@ Nothing is left behind after Cancel or a timeout (the block ended with 124 and l
 file). [csv-report.sh](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/examples/csv-report.sh)
 does the same with a `trap`.
 
+<a id="timeout-is-for-people"></a>
+
 ## `--timeout` is for people, not for hangs
 
 Without `--timeout` a window waits as long as the person needs. Add it when an unattended
