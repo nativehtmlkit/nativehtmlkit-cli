@@ -7,6 +7,7 @@
 | `fake_host_faults.rs` | every host fault ends in a classified, bounded, payload-free failure: host never answers, dropped RPC, hang while idle, death mid-request, truncated/stalled/malformed/oversized/zero-length frames, uncorrelated responses, host errors, renderer errors, invalid selections, quit that never completes, missing credentials | nothing |
 | `launcher_e2e.rs` | the real `nativehtmlkit` executable as a pipeline stage: exact stdout bytes, exit status, stderr discipline, watchdog (hung, crashed, never-started host), signals, diagnostics propagation, privacy sentinel, cleanup of processes and the session directory | nothing |
 | `scripts/qualify.py run` (real-host checks) | the release binary against the real pinned Core host, headless: handshake, liveness, deadline, session-id correlation with host records, privacy at trace level, a frozen host, a killed host | a Core host binary |
+| `scripts/test-publish-gates.py` | every publish gate of the packager (dirty tree, missing or misplaced tag, missing `gh`, existing release, stale manifest) and the upload step, against a throw-away Git repository and a fake `gh`; nothing is published | git |
 | `tests/gui/linux-kde-wayland.sh`, `tests/gui/windows-interactive.ps1` | real windows and real input on KDE Plasma Wayland and an interactive Windows desktop, from a clean extraction of the release archive | a desktop session |
 
 `cargo test` runs the first four on Linux and Windows. They use the platform's real transport

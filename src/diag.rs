@@ -257,16 +257,42 @@ impl Record {
         }
         let mut line = Value::Object(object).to_string();
         line.push('\n');
-        write_line(state, line.as_bytes());
+        emit_line(state, line.as_bytes());
     }
 }
 
+/// Write one complete line (text plus newline) with a single `write` call.
+///
+/// The host, the launcher and the relayed backend records share stderr. A line handed over
+/// in pieces (text, then newline, or the several fragments `eprintln!` produces on
+/// unbuffered stderr) can have another process's line land in the middle of it, which
+/// yields a line that is neither record. Every stderr line of this program goes through
+/// here; `scripts/check-repo.py` rejects `eprintln!`/`eprint!` in `src/`.
+pub fn write_line(out: &mut impl Write, text: &[u8]) -> std::io::Result<()> {
+    let mut line = Vec::with_capacity(text.len() + 1);
+    line.extend_from_slice(text.strip_suffix(b"\n").unwrap_or(text));
+    line.push(b'\n');
+    out.write_all(&line)
+}
+
+/// One line on stderr (see `write_line`). Failures to write diagnostics are ignored.
+pub fn stderr_line(text: &str) {
+    let _ = write_line(&mut std::io::stderr().lock(), text.as_bytes());
+}
+
+/// Human-readable lines that are part of the CLI's stderr contract.
+pub fn failure_line(failure: &crate::error::Failure) -> String {
+    format!("nativehtmlkit: {failure}")
+}
+pub const DEADLINE_NOTICE: &str =
+    "nativehtmlkit: no decision before the --timeout deadline; the window was closed";
+
 /// Diagnostics must never fail or block the session: write errors are counted or ignored.
-fn write_line(state: &State, line: &[u8]) {
+fn emit_line(state: &State, line: &[u8]) {
     let mut sink = state.sink.lock().unwrap_or_else(|e| e.into_inner());
     match &mut *sink {
         Sink::Stderr => {
-            let _ = std::io::stderr().lock().write_all(line);
+            let _ = write_line(&mut std::io::stderr().lock(), line);
         }
         Sink::File {
             file,
@@ -330,6 +356,42 @@ pub fn timestamp(now: SystemTime) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Records how a writer was called: one entry per `write`.
+    #[derive(Default)]
+    pub struct CallLog(pub Vec<Vec<u8>>);
+    impl Write for CallLog {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.push(bytes.to_vec());
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// Regression test for interleaved stderr lines: the error line, the deadline notice
+    /// and a diagnostic record each reach the stream as exactly one write that ends with
+    /// the newline, so no other writer's line can split them.
+    #[test]
+    fn every_stderr_line_is_a_single_write_including_its_newline() {
+        let failure = crate::error::Failure::new(crate::error::code::HOST_UNRESPONSIVE, "hung")
+            .during("host.diagnostics", "nhk-9", Duration::from_millis(6000));
+        let record = b"{\"schema_version\":1,\"event\":\"rpc.completed\"}\n";
+        for text in [
+            failure_line(&failure).as_bytes(),
+            DEADLINE_NOTICE.as_bytes(),
+            &record[..],
+        ] {
+            let mut log = CallLog::default();
+            write_line(&mut log, text).unwrap();
+            assert_eq!(log.0.len(), 1, "line was written in {} pieces", log.0.len());
+            let written = &log.0[0];
+            assert_eq!(written.last(), Some(&b'\n'));
+            assert_eq!(written.iter().filter(|&&b| b == b'\n').count(), 1);
+            assert!(written.starts_with(text.strip_suffix(b"\n").unwrap_or(text)));
+        }
+    }
 
     #[test]
     fn timestamps_are_iso_8601_utc() {

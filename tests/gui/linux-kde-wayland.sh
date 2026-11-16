@@ -188,6 +188,18 @@ case_s09_resize_keeps_footer() {
   verdict 0 'row 2\n'
   rows 3
 }
+case_s09_resize_vh_css() {
+  # The same shrink with a user stylesheet that sizes the list in viewport-height units
+  # (the CLI's own layout up to 0.1.1). Core re-resolves vh on resize since 1.0.3
+  # (NHK-CROSS-0005); with an older host the footer leaves the window and this case fails.
+  printf '%s' 'main{display:block;height:auto;min-height:100vh}#nhk-selection-form{display:block}.scroll{max-height:calc(100vh - 170px)}' > "$OUT/vh.css"
+  rows 60; start s09-resize-vh-css "$OUT/rows60.txt" select --multi --css "$OUT/vh.css"
+  shot 01-before; click $PICK_X "$(row_y 1)"
+  ~/lab/bin/lab-drag 640 695 640 545; sleep 1; shot 02-after-vertical-shrink
+  click 1000 $((636 - 150))        # with max-height:calc(100vh - 170px) the footer sits at y=636
+  verdict 0 'row 2\n'
+  rows 3
+}
 case_s11_kill() {
   start s11-sigkill-launcher "$OUT/abc.txt" select --multi
   local cli; cli=$(pgrep -n -f "$BIN/nhk select --multi"); echo "cli_pid=$cli" > "$CASE_DIR/kill.txt"
@@ -253,7 +265,7 @@ case_s15_slow_user() {
   shot 01-open; sleep 9; shot 02-still-open-after-idle
   click $PICK_X "$(row_y 1)"; click "${SUBMIT[@]}"
   verdict 0 'beta\n'
-  local probes; probes=$(grep -c '"event":"rpc.completed".*"operation":"host.capabilities"' "$CASE_DIR/stderr.txt")
+  local probes; probes=$(grep -c '"event":"rpc.completed".*"operation":"host.diagnostics"' "$CASE_DIR/stderr.txt")
   check s15-slow-user-probes "liveness probes answered while idle: $probes (need >= 6), no error line" \
     bash -c '[[ $0 -ge 6 ]] && ! grep -q "error\[" "$1"' "$probes" "$CASE_DIR/stderr.txt"
 }
@@ -396,7 +408,7 @@ case_s18_diagnostics() {
              grep -q "\"event\":\"rpc.completed\",\"request_id\":\"nhk-[0-9]*\",\"operation\":\"document.command\",\"duration_ms\":[0-9]" "$0"' "$err"
 }
 
-ALL=(case_s02_multi case_s02_order case_s02_single case_s03_cancel case_s03_close case_s03_empty_submit case_s04_invalid case_s05_bounds case_s06_json case_s07_csv case_s10_hostile case_view case_s08_form case_s09_keyboard case_s09_keyboard_submit case_s09_resize case_s09_resize_keeps_footer case_s11_kill case_s13_parallel case_s15_slow_user case_s15_resize_hold case_s15_file_dialog case_s16_hung_host case_s16_eventloop_hang_dead_launcher case_s17_deadline case_s18_diagnostics)
+ALL=(case_s02_multi case_s02_order case_s02_single case_s03_cancel case_s03_close case_s03_empty_submit case_s04_invalid case_s05_bounds case_s06_json case_s07_csv case_s10_hostile case_view case_s08_form case_s09_keyboard case_s09_keyboard_submit case_s09_resize case_s09_resize_keeps_footer case_s09_resize_vh_css case_s11_kill case_s13_parallel case_s15_slow_user case_s15_resize_hold case_s15_file_dialog case_s16_hung_host case_s16_eventloop_hang_dead_launcher case_s17_deadline case_s18_diagnostics)
 # Pre-flight: the desktop is shared. Another NativeHTMLKit window would take our clicks, so
 # the suite does not start (BLOCKED, not FAIL) while one is open.
 for _ in $(seq 1 6); do [[ $(foreign_windows) == 0 ]] && break; sleep 5; done

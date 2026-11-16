@@ -245,6 +245,33 @@ enum Action {
     Submit,
 }
 
+/// JSON-RPC code the host answers once shutdown has begun (protocol README, error codes).
+const HOST_INVALID_STATE: i64 = -32008;
+
+/// A request that collided with the host shutting down (the user closed the window in the
+/// same instant) is not a failure of the session: the host is ending it, and whatever was
+/// committed before stands. Returns true for exactly that rejection.
+fn rejected_by_shutdown(error: &anyhow::Error) -> bool {
+    let failure = crate::error::classify(error, code::INTERNAL);
+    failure.code == code::RPC_REJECTED && failure.host_code == Some(HOST_INVALID_STATE)
+}
+
+/// Ask the host to end the session. Returns the instant from which `app.shutdown` is due;
+/// a host that is already shutting down counts as having been asked.
+fn request_quit(client: &mut Client) -> Result<Instant> {
+    match client.call(method::REQUEST_QUIT, json!({})) {
+        Ok(_) => {}
+        Err(failure)
+            if failure.code == code::RPC_REJECTED
+                && failure.host_code == Some(HOST_INVALID_STATE) =>
+        {
+            diag::record(Level::Debug, "host.already_shutting_down").emit();
+        }
+        Err(failure) => return Err(failure.into()),
+    }
+    Ok(Instant::now())
+}
+
 fn interact(
     dir: &Path,
     client: &mut Client,
@@ -262,6 +289,7 @@ fn interact(
     let opened = Instant::now();
     let mut idle = Duration::ZERO;
     let mut quit_requested: Option<Instant> = None;
+    let mut dropped_seen = 0_u64;
 
     loop {
         let mut slice = liveness.unwrap_or(IDLE_SLICE);
@@ -288,13 +316,21 @@ fn interact(
                     .duration(opened.elapsed())
                     .emit();
                 session::save_outcome(dir, &Outcome::TimedOut)?;
-                client.call(method::REQUEST_QUIT, json!({}))?;
-                quit_requested = Some(Instant::now());
+                quit_requested = Some(request_quit(client)?);
             }
             if liveness.is_some_and(|interval| idle >= interval) {
                 // Silence alone proves nothing: the user may simply be reading. Ask.
-                client.probe()?;
+                let dropped = client.probe()?;
                 idle = Duration::ZERO;
+                if dropped > dropped_seen {
+                    // The host discarded window/document events because this backend was
+                    // not reading fast enough: a click may have been lost ("Submit did
+                    // nothing"). Disclose it; the count is all the host reports.
+                    diag::record(Level::Normal, "host.notifications_dropped")
+                        .num("total", dropped)
+                        .emit();
+                    dropped_seen = dropped;
+                }
             }
             continue;
         };
@@ -333,11 +369,21 @@ fn interact(
                 session::save_outcome(dir, &Outcome::Viewed)?;
                 true
             }
-            Action::Submit => submit(dir, client, specification, window_id, doc_id)?,
+            Action::Submit => match submit(dir, client, specification, window_id, doc_id) {
+                Ok(accepted) => accepted,
+                Err(error) if rejected_by_shutdown(&error) => {
+                    // Submit and closing the window at the same instant: the close wins.
+                    // Nothing was committed, so the launcher reports Cancel once the host
+                    // has announced the shutdown it already began.
+                    diag::record(Level::Debug, "submit.superseded_by_shutdown").emit();
+                    quit_requested = Some(Instant::now());
+                    false
+                }
+                Err(error) => return Err(error),
+            },
         };
         if quit {
-            client.call(method::REQUEST_QUIT, json!({}))?;
-            quit_requested = Some(Instant::now());
+            quit_requested = Some(request_quit(client)?);
         }
     }
 }

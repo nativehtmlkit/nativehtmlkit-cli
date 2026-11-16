@@ -220,7 +220,7 @@ def check_deadline(host, work, version):
     expect(s.code == 124 and s.stdout == b"", f"exit {s.code}, stdout {s.stdout!r}\n{s.stderr()[-2000:]}")
     done = [r["operation"] for r in s.records() if r["event"] == "rpc.completed"]
     expect(done[:5] == ["host.hello", "host.diagnostics", "window.create", "document.load", "app.ready"], str(done))
-    probes = done.count("host.capabilities")
+    probes = done.count("host.diagnostics") - 1  # the first one is the start-up query for the host pid
     expect(probes >= 5, f"only {probes} liveness probes answered in 2.5 s")
     expect("error[" not in s.stderr(), s.stderr()[-2000:])
     hello = next(r for r in s.records() if r["event"] == "handshake.completed")
@@ -396,6 +396,9 @@ def run(a) -> int:
     recorder.command("cli.dependency-policy", "G0",
                      ["cargo", "deny", "--offline", "check", "licenses", "bans", "sources", "advisories"],
                      requires="cargo-deny", detail_from=lambda text: text.strip().splitlines()[-1])
+    # Every publish gate against a throw-away repository and a fake gh; publishes nothing.
+    recorder.command("cli.publish-gates-simulation", "G8", [python, "scripts/test-publish-gates.py"],
+                     detail_from=lambda text: text.strip().splitlines()[-1])
     recorder.command("cli.fmt", "G0", ["cargo", "fmt", "--all", "--", "--check"])
     recorder.command("cli.clippy", "G0", ["cargo", "clippy", "--locked", "--all-targets", "--", "-D", "warnings"])
     recorder.command("cli.unit-tests", "G2", ["cargo", "test", "--locked", "--bins"], detail_from=test_counts)

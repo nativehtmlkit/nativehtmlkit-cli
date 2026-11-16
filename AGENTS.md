@@ -1,7 +1,7 @@
 # NativeHTMLKit CLI — Agent instructions
 
 1. This is an independent Rust CLI repo. Do NOT depend on `../nativehtmlkit-core/crates/*`, embed the renderer, launch a Python/PowerShell SDK or rebuild Core as an implicit packaging step.
-2. Read `README.md` and `docs/QUALIFICATION.md` first. The Core protocol v1 candidate is located in the sibling Core repository when present; standalone clones must use a released Core protocol artifact.
+2. Read `README.md` and `docs/QUALIFICATION.md` first. The Core protocol v1 contract (public-stable 1.0 since Core 1.0.3) is located in the sibling Core repository when present; standalone clones must use a released Core protocol artifact.
 3. CLI public executable is `nativehtmlkit` and short alias `nhk`. The binary's hidden `__backend` subcommand is for the Core-supervised process; users invoke `select`, `view`, `form`, `doctor`.
 4. The input source is stdin, output bytes go only to stdout after Submit; any logs must go to stderr. Exit code 2 means Cancel; errors fail closed.
 5. Complete/verify local integration with Core v1 before declaring a stable release. Maintain source-derived protocol compatibility, not optimistic assumptions.

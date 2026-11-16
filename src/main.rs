@@ -340,7 +340,7 @@ fn main() {
                     .failure(&failure)
                     .emit();
             }
-            eprintln!("nativehtmlkit: {failure}");
+            diag::stderr_line(&diag::failure_line(&failure));
             1
         }
     };

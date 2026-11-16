@@ -188,11 +188,11 @@ impl Conn {
                 return request;
             }
             assert_eq!(
-                request["method"], "host.capabilities",
+                request["method"], "host.diagnostics",
                 "unexpected {request}"
             );
             *probes += 1;
-            self.answer(&request, json!({"features":{}}));
+            self.answer(&request, json!({"phase":"ready","dropped_notifications":0}));
         }
     }
 
@@ -204,11 +204,11 @@ impl Conn {
         while Instant::now() < until {
             if let Some(request) = self.poll_frame() {
                 assert_eq!(
-                    request["method"], "host.capabilities",
+                    request["method"], "host.diagnostics",
                     "unexpected {request}"
                 );
                 probes += 1;
-                self.answer(&request, json!({"features":{}}));
+                self.answer(&request, json!({"phase":"ready","dropped_notifications":0}));
             }
         }
         self.set_read_timeout(Some(Duration::from_secs(20)));

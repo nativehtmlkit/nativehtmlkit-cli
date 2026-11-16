@@ -27,7 +27,6 @@ public static class NhkInput {
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
-  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
   [DllImport("kernel32.dll")] public static extern bool AttachConsole(uint pid);
   [DllImport("kernel32.dll")] public static extern bool FreeConsole();
   [DllImport("kernel32.dll")] public static extern bool SetConsoleCtrlHandler(IntPtr h, bool add);
@@ -190,6 +189,25 @@ function Guard([scriptblock]$body) {
 
 $abc = Fixture 'abc.txt' (Utf8 "alpha`nbeta`ngamma`n")
 $C = @{}
+$C['s01_work_area'] = {
+    # Core 1.0.3: a new window's frame is inside the monitor's work area when it is shown,
+    # also for the later windows of a cascade. Eight windows are opened one after another.
+    $area = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    $outside = @(); $frames = @()
+    foreach ($i in 1..8) {
+        Start-Case 's01-work-area' $abc @('view', '--title', "NHK area $i")
+        $w = Find-Window "NHK area $i"
+        $f = New-Object NhkInput+RECT; [void][NhkInput]::GetWindowRect([IntPtr]$w.Current.NativeWindowHandle, [ref]$f)
+        $frames += "$($f.Left),$($f.Top),$($f.Right),$($f.Bottom)"
+        if ($f.Left -lt $area.Left -or $f.Top -lt $area.Top -or $f.Right -gt $area.Right -or $f.Bottom -gt $area.Bottom) { $outside += $i }
+        if ($i -eq 8) { Shot '01-eighth-window' }
+        Click-Element (Find-Element $w 'Close' 'ControlType.Button')
+        if (-not $script:Proc.WaitForExit(15000)) { try { $script:Proc.Kill() } catch {} }
+    }
+    "work_area=$($area.Left),$($area.Top),$($area.Right),$($area.Bottom)`r`n" + ($frames -join "`r`n") | Set-Content (Join-Path $script:CaseDir 'geometry.txt')
+    Check 's01-work-area' ($outside.Count -eq 0 -and (Leftovers) -eq 0) "8 windows opened in a row; frames outside the work area $($area.Width)x$($area.Height): $(if ($outside.Count) { $outside -join ',' } else { 'none' }) (see geometry.txt)"
+    Cleanup-Own
+}
 $C['s02_multi'] = {
     Start-Case 's02-multi-beta' $abc @('select', '--multi', '--title', 'NHK s02')
     $w = Find-Window 'NHK s02'; Focus-Window $w; Dump-Tree $w; Shot '01-open'
@@ -317,10 +335,7 @@ $C['s09_resize_keeps_footer'] = {
     Start-Case 's09-resize-keeps-footer' $rows60 @('select', '--multi', '--title', 'NHK footer')
     $w = Find-Window 'NHK footer'; Focus-Window $w; Shot '01-before'
     $hwnd = [IntPtr]$w.Current.NativeWindowHandle
-    # Test set-up, not user input: Windows cascades new windows and this one may reach below
-    # the screen edge and under the taskbar. Put it where the whole frame is visible.
-    [void][NhkInput]::SetWindowPos($hwnd, [IntPtr]::Zero, 60, 30, 0, 0, 0x0001 -bor 0x0004)   # NOSIZE | NOZORDER
-    Start-Sleep -Milliseconds 500
+    # No repositioning: since Core 1.0.3 a new window's frame is inside the work area (s01).
     Click-Element (Find-Pick $w 2)
     $before = New-Object NhkInput+RECT; [void][NhkInput]::GetWindowRect($hwnd, [ref]$before)
     $x0 = [int](($before.Left + $before.Right) / 2); $y0 = $before.Bottom - 4      # bottom sizing border
@@ -335,6 +350,30 @@ $C['s09_resize_keeps_footer'] = {
     Click-Element $submit
     Verdict 0 (Utf8 "row 2`n")
     Check 's09-resize-keeps-footer-geometry' ((($after.Bottom - $after.Top) -lt ($before.Bottom - $before.Top)) -and $inside) "frame height $($before.Bottom - $before.Top) -> $($after.Bottom - $after.Top); Submit button at y=$([int]$r.Y)..$([int]($r.Y + $r.Height)) inside the frame $($after.Top)..$($after.Bottom): $inside"
+}
+$C['s09_resize_vh_css'] = {
+    # The same shrink with a user stylesheet that sizes the list in viewport-height units
+    # (the CLI's own layout up to 0.1.1). Core re-resolves vh on resize since 1.0.3
+    # (NHK-CROSS-0005); with an older host the Submit button leaves the window.
+    $css = Fixture 'vh.css' (Utf8 'main{display:block;height:auto;min-height:100vh}#nhk-selection-form{display:block}.scroll{max-height:calc(100vh - 170px)}')
+    $rows60 = Fixture 'rows60.txt' (Utf8 ((1..60 | ForEach-Object { "row $_" }) -join "`n"))
+    Start-Case 's09-resize-vh-css' $rows60 @('select', '--multi', '--css', $css, '--title', 'NHK vh')
+    $w = Find-Window 'NHK vh'; Focus-Window $w; Shot '01-before'
+    $hwnd = [IntPtr]$w.Current.NativeWindowHandle
+    Click-Element (Find-Pick $w 2)
+    $before = New-Object NhkInput+RECT; [void][NhkInput]::GetWindowRect($hwnd, [ref]$before)
+    $x0 = [int](($before.Left + $before.Right) / 2); $y0 = $before.Bottom - 4
+    [void][NhkInput]::SetCursorPos($x0, $y0); Start-Sleep -Milliseconds 300
+    [NhkInput]::mouse_event(0x0002, 0, 0, 0, [IntPtr]::Zero)
+    1..15 | ForEach-Object { [void][NhkInput]::SetCursorPos($x0, $y0 - 10 * $_); Start-Sleep -Milliseconds 40 }
+    [NhkInput]::mouse_event(0x0004, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 800; Shot '02-after-vertical-shrink'
+    $after = New-Object NhkInput+RECT; [void][NhkInput]::GetWindowRect($hwnd, [ref]$after)
+    $submit = Find-Element $w 'Submit selection' 'ControlType.Button'
+    $r = $submit.Current.BoundingRectangle
+    $inside = ($r.Y -ge $after.Top) -and (($r.Y + $r.Height) -le $after.Bottom)
+    Click-Element $submit
+    Verdict 0 (Utf8 "row 2`n")
+    Check 's09-resize-vh-css-geometry' ((($after.Bottom - $after.Top) -lt ($before.Bottom - $before.Top)) -and $inside) "frame height $($before.Bottom - $before.Top) -> $($after.Bottom - $after.Top); Submit button at y=$([int]$r.Y)..$([int]($r.Y + $r.Height)) inside the frame $($after.Top)..$($after.Bottom): $inside"
 }
 $C['s10_hostile'] = {
     $h = Fixture 'hostile.txt' (Utf8 "<script>alert(1)</script>`n<b>bold?</b> & `"q`" 's`nPříliš žluťoučký kůň 漢字 😀 עברית`n")
@@ -413,7 +452,7 @@ $C['s15_slow_user'] = {
     Click-Element (Find-Pick $w 2); Click-Element (Find-Element $w 'Submit selection' 'ControlType.Button')
     Verdict 0 (Utf8 "beta`n")
     $err = Stderr-Text
-    $probes = ([regex]::Matches($err, '"event":"rpc\.completed"[^\n]*"operation":"host\.capabilities"')).Count
+    $probes = ([regex]::Matches($err, '"event":"rpc\.completed"[^\n]*"operation":"host\.diagnostics"')).Count
     Check 's15-slow-user-probes' ($probes -ge 6 -and $err -notmatch 'error\[') "liveness probes answered while idle: $probes (need >= 6), no error line"
 }
 $C['s15_modal_hold'] = {
@@ -539,7 +578,7 @@ $C['s18_diagnostics'] = {
     Check 's18-trace-explains-submit' $explains 'trace shows the rejected and the accepted submit with request ids and durations'
 }
 
-$names = if ($Cases.Count) { $Cases } else { @('s02_multi','s02_single','s03_cancel','s03_close','s03_empty_submit','s04_invalid','s05_bounds','s06_json','s07_csv','s08_form','s09_keyboard','s09_keyboard_submit','s09_resize','s09_resize_keeps_footer','s10_hostile','view','s11_kill','s11_ctrlc','s13_parallel','s15_slow_user','s15_modal_hold','s15_resize_hold','s15_file_dialog','s16_hung_host','s17_deadline','s18_diagnostics') }
+$names = if ($Cases.Count) { $Cases } else { @('s01_work_area','s02_multi','s02_single','s03_cancel','s03_close','s03_empty_submit','s04_invalid','s05_bounds','s06_json','s07_csv','s08_form','s09_keyboard','s09_keyboard_submit','s09_resize','s09_resize_keeps_footer','s09_resize_vh_css','s10_hostile','view','s11_kill','s11_ctrlc','s13_parallel','s15_slow_user','s15_modal_hold','s15_resize_hold','s15_file_dialog','s16_hung_host','s17_deadline','s18_diagnostics') }
 Log "suite start session=$((Get-Process -Id $PID).SessionId) user=$env:USERNAME cases=$($names -join ',')"
 # Pre-flight: the desktop is shared. Another NativeHTMLKit window would take our clicks, so
 # the suite does not start (BLOCKED, not FAIL) while one is open.

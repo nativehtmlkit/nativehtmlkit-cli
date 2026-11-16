@@ -218,6 +218,17 @@ def core_release(host: pathlib.Path, pinned: str, version: str) -> tuple[pathlib
         problems.append(f"protocol version {manifest.get('protocol_version')}")
     if manifest.get("platform") != ("windows-x64" if WINDOWS else "linux-x64"):
         problems.append(f"platform {manifest.get('platform')}")
+    # Since Core 1.0.3 the host carries its own source identity (`--version --verbose`).
+    # What the binary says about itself must agree with the release manifest beside it.
+    if tuple(int(x) for x in re.findall(r"\d+", version)[:3]) >= (1, 0, 3):
+        told = run([str(host), "--version", "--verbose"])
+        try:
+            embedded = json.loads(told.stdout.strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            raise SystemExit(f"{host.name} --version --verbose did not print a JSON identity: {told.stdout!r} {told.stderr!r}")
+        for key in ("version", "source_commit", "source_dirty", "source_tree"):
+            if embedded.get(key) != manifest.get(key):
+                problems.append(f"host embeds {key}={embedded.get(key)!r}, release manifest says {manifest.get(key)!r}")
     if problems:
         raise SystemExit("Core release does not match the pin: " + "; ".join(problems))
     return directory, manifest
@@ -240,10 +251,27 @@ def publish_refusal(version: str, identity: dict) -> str | None:
     tagged = run(["git", "rev-parse", "--verify", tag + "^{commit}"], cwd=ROOT).stdout.strip()
     if tagged != identity["source_commit"]:
         return f"Tag {tag} does not point at HEAD {identity['source_commit']}"
-    if shutil.which("gh") is None:
+    gh = shutil.which("gh")
+    if gh is None:
         return "gh CLI is required for --publish"
-    if subprocess.run(["gh", "release", "view", tag, "--repo", REPO], cwd=ROOT, capture_output=True).returncode == 0:
+    if subprocess.run([gh, "release", "view", tag, "--repo", REPO], cwd=ROOT, capture_output=True).returncode == 0:
         return f"GitHub release {tag} already exists; release versions are immutable"
+    return None
+
+
+def publish(archive: pathlib.Path, version: str, staged: dict) -> str | None:
+    """Upload an already built and verified archive. Returns a refusal text, or None after a
+    successful upload (the sidecar next to the archive is then the local record)."""
+    head = run(["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=ROOT).stdout.strip()
+    if staged["source_commit"] != head or staged["source_dirty"] is not False:
+        return "staged manifest is not from a clean HEAD; refusing to publish"
+    # No GitHub Actions exist in this repository; this only uploads the archive built before.
+    subprocess.run([shutil.which("gh") or "gh", "release", "create", "v" + version, str(archive), "--repo", REPO,
+                    "--verify-tag", "--title", "NativeHTMLKit CLI v" + version, "--notes", "Locally built and qualified."],
+                   cwd=ROOT, check=True)
+    (archive.parent / (archive.name + ".published.json")).write_text(json.dumps(
+        {"published": True, "tag": "v" + version, "repository": REPO, "archive_sha256": sha256(archive),
+         "source_commit": staged["source_commit"]}, indent=2) + "\n")
     return None
 
 
@@ -453,16 +481,9 @@ def main() -> int:
     print(f"staged and verified: {archive}\n  sha256 {archive_sha}\n  host   {host_sha} ({host_version})\n"
           f"  cli    {manifest['cli_sha256']}\n  source {manifest['source_tree_sha256']} (commit {manifest['source_commit'][:12]}, dirty={manifest['source_dirty']})")
     if a.publish:
-        staged = json.loads((stage / "manifest.json").read_text())
-        head = run(["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=ROOT).stdout.strip()
-        if staged["source_commit"] != head or staged["source_dirty"] is not False:
-            p.error("staged manifest is not from a clean HEAD; refusing to publish")
-        # No GitHub Actions exist in this repository; this only uploads the archive built above.
-        subprocess.run(["gh", "release", "create", "v" + a.version, str(archive), "--repo", REPO,
-                        "--verify-tag", "--title", "NativeHTMLKit CLI v" + a.version, "--notes", "Locally built and qualified."], check=True)
-        (dist / (archive.name + ".published.json")).write_text(json.dumps(
-            {"published": True, "tag": "v" + a.version, "repository": REPO, "archive_sha256": archive_sha,
-             "source_commit": staged["source_commit"]}, indent=2) + "\n")
+        refusal = publish(archive, a.version, json.loads((stage / "manifest.json").read_text()))
+        if refusal:
+            p.error(refusal)
     return 0
 
 

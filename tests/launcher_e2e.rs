@@ -66,6 +66,23 @@ fn fake_host(scenario: &str, args: &[String]) -> i32 {
     }
     // Like the real host, log to stderr; the CLI must pass this through untouched.
     eprintln!("{{\"fake_host\":\"started\"}}");
+    if std::env::var_os("NHK_FAKE_CHATTY").is_some() {
+        // A host that logs continuously (one complete line per write, as Core does) on the
+        // stderr it shares with the launcher.
+        std::thread::spawn(|| {
+            use std::io::Write;
+            let mut n = 0_u64;
+            loop {
+                n += 1;
+                let line = format!(
+                    "{{\"fake_host\":\"log\",\"n\":{n},\"pad\":\"{}\"}}\n",
+                    "x".repeat(200)
+                );
+                let _ = std::io::stderr().lock().write_all(line.as_bytes());
+                std::thread::sleep(Duration::from_micros(200));
+            }
+        });
+    }
     match scenario {
         "never_start" => hang(),
         "exit_7" => return 7,
@@ -174,6 +191,15 @@ fn fake_host(scenario: &str, args: &[String]) -> i32 {
             let data = conn.serve_until("document.command", &mut probes);
             std::thread::sleep(delay);
             conn.answer(&data, json!({"entries":[{"name":"selection","value":"1"}]}));
+        }
+        // Submit and closing the window in the same instant: the host is already shutting
+        // down, rejects the backend's request with -32008 and announces the shutdown.
+        "submit_collides_with_close" => {
+            conn.click("nhk-submit");
+            let data = conn.serve_until("document.command", &mut probes);
+            conn.send(json!({"jsonrpc":"2.0","id":data["id"],"error":{"code":-32008,"message":"Application is shutting down or failed"}}));
+            conn.shutdown();
+            return i32::from(!backend.wait().unwrap().success());
         }
         "cancel" => conn.click("nhk-cancel"),
         "done" => conn.click("nhk-done"),
@@ -323,8 +349,20 @@ impl Invocation<'_> {
         let tmp = tempfile::tempdir().unwrap();
         let started = Instant::now();
         let mut child = self.command(tmp.path()).spawn().unwrap();
-        child.stdin.take().unwrap().write_all(self.stdin).unwrap();
+        feed(&mut child, self.stdin);
         collect(child, tmp, started)
+    }
+}
+
+/// Write the pipeline input and close stdin. A CLI that rejects its arguments exits without
+/// reading stdin, so a broken pipe here is expected and not an error of the test.
+fn feed(child: &mut std::process::Child, input: &[u8]) {
+    let mut stdin = child.stdin.take().unwrap();
+    match stdin.write_all(input) {
+        Err(error) if error.kind() != std::io::ErrorKind::BrokenPipe => {
+            panic!("write stdin: {error}")
+        }
+        _ => {}
     }
 }
 
@@ -391,6 +429,15 @@ fn cancel_and_window_close_exit_2_with_empty_stdout() {
         );
         run.assert_clean();
     }
+}
+
+/// A Submit that collides with the window being closed is a Cancel (exit 2), never an error.
+fn submit_colliding_with_window_close_is_cancel() {
+    let run = invoke("submit_collides_with_close", &["select"], ABC).run();
+    assert_eq!(run.code, Some(2), "{}", run.stderr);
+    assert!(run.stdout.is_empty());
+    assert!(!run.stderr.contains("error["), "{}", run.stderr);
+    run.assert_clean();
 }
 
 fn view_exits_0_with_empty_stdout() {
@@ -468,7 +515,10 @@ fn input_and_usage_errors_exit_1_before_any_host_starts() {
 
 fn help_and_version_succeed_on_stdout() {
     for (args, needle) in [
-        (vec!["--version"], "nativehtmlkit 0.1.1"),
+        (
+            vec!["--version"],
+            concat!("nativehtmlkit ", env!("CARGO_PKG_VERSION")),
+        ),
         (vec!["--help"], "--rpc-timeout"),
         (vec!["select", "--help"], "--timeout"),
     ] {
@@ -492,7 +542,7 @@ fn missing_host_is_classified() {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    child.stdin.take().unwrap().write_all(ABC).unwrap();
+    feed(&mut child, ABC);
     let output = child.wait_with_output().unwrap();
     assert_eq!(output.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&output.stderr).contains("error[host.not_found]"));
@@ -528,7 +578,7 @@ fn hung_host_is_detected_reported_and_killed() {
     assert_eq!(failed.len(), 1, "stderr: {}", run.stderr);
     assert_eq!(failed[0]["error_code"], "host.unresponsive");
     assert_eq!(failed[0]["role"], "launcher");
-    assert_eq!(failed[0]["context"]["operation"], "host.capabilities");
+    assert_eq!(failed[0]["context"]["operation"], "host.diagnostics");
     // The backend's own records are relayed even at the default level for failures.
     assert_eq!(events(&records, "backend.failed")[0]["role"], "backend");
     assert_eq!(events(&records, "host.watchdog").len(), 1);
@@ -815,6 +865,44 @@ fn diagnostics_flag_reaches_host_backend_and_stderr() {
     assert!(!events(&records, "rpc.started").is_empty());
 }
 
+/// Regression test for interleaved stderr lines: the host logs continuously on the stream
+/// it shares with the launcher while the launcher relays a trace-level session. Every line
+/// that reaches stderr must be one whole JSON object from one writer.
+fn stderr_lines_stay_whole_next_to_a_chatty_host() {
+    let mut invocation = invoke(
+        "idle_then_select:1",
+        &[
+            "--diagnostics",
+            "trace",
+            "--rpc-timeout",
+            "2",
+            "--liveness-interval",
+            "0.02",
+            "select",
+        ],
+        ABC,
+    );
+    invocation.env = vec![("NHK_FAKE_CHATTY", "1")];
+    let run = invocation.run();
+    assert_eq!((run.code, run.stdout.as_slice()), (Some(0), &b"beta\n"[..]));
+    let (mut ours, mut hosts) = (0, 0);
+    for line in run.stderr.lines().filter(|l| !l.is_empty()) {
+        let value: Value = serde_json::from_str(line).unwrap_or_else(|error| {
+            panic!("a stderr line is not one whole record ({error}): {line}")
+        });
+        if value.get("schema_version").is_some() {
+            ours += 1;
+        } else {
+            assert!(value.get("fake_host").is_some(), "{line}");
+            hosts += 1;
+        }
+    }
+    assert!(
+        ours > 100 && hosts > 1000,
+        "not enough concurrent traffic: {ours} CLI records, {hosts} host lines"
+    );
+}
+
 fn inherited_diagnostics_environment_is_preserved() {
     let mut invocation = invoke("select:0", &["select"], ABC);
     invocation.env = vec![
@@ -925,7 +1013,7 @@ fn stdout_write_failure_is_an_error() {
             .unwrap(),
     );
     let mut child = command.spawn().unwrap();
-    child.stdin.take().unwrap().write_all(ABC).unwrap();
+    feed(&mut child, ABC);
     let run = collect(child, tmp, Instant::now());
     run.assert_failed("output.failed");
     run.assert_clean();
@@ -943,7 +1031,7 @@ fn doctor_reports_the_host_and_is_bounded() {
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     let stdout = String::from_utf8_lossy(&run.stdout);
     assert!(
-        stdout.contains("NativeHTMLKit CLI 0.1.1")
+        stdout.contains(concat!("NativeHTMLKit CLI ", env!("CARGO_PKG_VERSION")))
             && stdout.contains("nativehtmlkit-host 0.0.0-fake"),
         "{stdout}"
     );
@@ -967,7 +1055,7 @@ fn termination_signals_clean_up() {
         );
         let tmp = tempfile::tempdir().unwrap();
         let mut child = invocation.command(tmp.path()).spawn().unwrap();
-        child.stdin.take().unwrap().write_all(ABC).unwrap();
+        feed(&mut child, ABC);
         let record = tmp.path().join("fake-host.record");
         let ready = Instant::now();
         while !std::fs::read_to_string(&record)
@@ -1009,7 +1097,7 @@ fn killed_launcher_takes_the_host_down() {
     );
     let tmp = tempfile::tempdir().unwrap();
     let mut child = invocation.command(tmp.path()).spawn().unwrap();
-    child.stdin.take().unwrap().write_all(ABC).unwrap();
+    feed(&mut child, ABC);
     let record = tmp.path().join("fake-host.record");
     let ready = Instant::now();
     while !std::fs::read_to_string(&record)
@@ -1146,6 +1234,16 @@ fn run_tests(args: &[String]) {
             "documents_the_host_would_refuse_are_refused_before_it_starts",
             ANY,
             documents_the_host_would_refuse_are_refused_before_it_starts,
+        ),
+        (
+            "submit_colliding_with_window_close_is_cancel",
+            ANY,
+            submit_colliding_with_window_close_is_cancel,
+        ),
+        (
+            "stderr_lines_stay_whole_next_to_a_chatty_host",
+            ANY,
+            stderr_lines_stay_whole_next_to_a_chatty_host,
         ),
         (
             "host_exiting_unsuccessfully_is_an_error",

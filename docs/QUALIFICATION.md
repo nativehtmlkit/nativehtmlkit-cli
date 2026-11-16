@@ -1,4 +1,9 @@
-# CLI qualification — v0.1.1 against Core 1.0.2 (2026-11-15)
+# CLI qualification
+
+> **v0.1.2** (for Core 1.0.3, wire protocol v1 stable) is qualified from its release commit; its
+> results are recorded here after the release, as for v0.1.1. Everything below describes v0.1.1.
+
+## v0.1.1 against Core 1.0.2 (2026-11-15)
 
 **Status: released as the prerelease
 [v0.1.1](https://github.com/nativehtmlkit/nativehtmlkit-cli/releases/tag/v0.1.1).** Every gate
@@ -6,7 +11,7 @@ below was executed on both platforms from the clean commit
 `d00abb78a8a322daecdc7dbcf0ded17e6300e95c` against the pinned Core 1.0.2 hosts (Core built from
 its clean commit `8a09875cff58aa16b60573ffca24de4d611d60b3`), and passed:
 **132 records, 132 PASS, 0 FAIL, 0 BLOCKED**. Both archive manifests record that commit and
-`source_dirty: false`. It is a prerelease because Core's wire protocol v1 is still `1.0-rc`.
+`source_dirty: false`. It was a prerelease because Core's wire protocol v1 was then still `1.0-rc`.
 The results recorded for v0.1.0 (`9ec8b606`, Core 1.0.1) are not inherited.
 
 | | Linux | Windows |

@@ -37,8 +37,15 @@ for source in list((root / "src").rglob("*.rs")) + list((root / "tests").rglob("
     assert "nativehtmlkit-core/crates" not in text, source
 
 for required in ("src/protocol.rs", "src/transport.rs", "src/backend.rs", "src/runner.rs", "src/diag.rs", "src/error.rs",
-                 "tests/fake_host_faults.rs", "tests/launcher_e2e.rs", "scripts/qualify.py", "scripts/package-local.py"):
+                 "tests/fake_host_faults.rs", "tests/launcher_e2e.rs", "scripts/qualify.py", "scripts/package-local.py", "scripts/build-release.py",
+                 "scripts/test-publish-gates.py"):
     assert (root / required).is_file(), required
+
+# stderr is shared with the host: every line must be one write (diag::write_line), which
+# the print macros do not guarantee.
+for source in (root / "src").rglob("*.rs"):
+    code = "\n".join(line for line in source.read_text().splitlines() if not line.lstrip().startswith("//"))
+    assert not re.search(r"\beprint(ln)?!", code), f"{source}: use diag::stderr_line instead of eprint!/eprintln!"
 
 # Documents that state the current version must state the real one.
 assert f"v{version}" in (root / "docs/QUALIFICATION.md").read_text(), "docs/QUALIFICATION.md does not describe this version"

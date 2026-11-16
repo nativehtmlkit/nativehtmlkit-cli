@@ -1,7 +1,7 @@
 # NativeHTMLKit CLI
 
 **Native graphical windows in ordinary command pipelines.** An independent Rust client of
-NativeHTMLKit Core's local host protocol v1. No Python, PowerShell, web server, Electron, Chromium
+NativeHTMLKit Core's local host protocol v1, the stable wire contract (1.0) since Core 1.0.3. No Python, PowerShell, web server, Electron, Chromium
 or JavaScript runtime. Canonical executable `nativehtmlkit`; `nhk` is an alias.
 
 ```bash
@@ -19,7 +19,7 @@ nhk doctor                                                     # which host is u
 |---|---|---|
 | Submitted / viewer closed | 0 | only the result (nothing for `view`) |
 | Error (bad input, usage error, host failure or hang) | 1 | empty |
-| Cancel button or window closed without submitting | 2 | empty |
+| Cancel button or window closed without submitting (also when Submit and the close arrive in the same instant: the close wins) | 2 | empty |
 | `--timeout` expired before the user decided | 124 | empty |
 | Interrupted by Ctrl+C / SIGINT | 130 | empty |
 | Terminated by SIGTERM / SIGHUP (the window is closed at once) | 143 / 129 | empty |
@@ -72,11 +72,11 @@ time. What is bounded is the *host*:
 | Option | Default | Bounds |
 |---|---|---|
 | `--rpc-timeout SECONDS` | 30 | one request/response, a frame that has started arriving, one write |
-| `--liveness-interval SECONDS` | 5 | idle time before the host is asked `host.capabilities` (answer due within 2 × `--rpc-timeout`); `0` disables probing |
+| `--liveness-interval SECONDS` | 5 | idle time before the host is asked `host.diagnostics` (answer due within 2 × `--rpc-timeout`); `0` disables probing |
 | `--startup-timeout SECONDS` | 15 | host start until the window is ready (plus a 5 s launcher margin) |
 | `--timeout SECONDS` | none | the user: closes the window and exits 124 |
 
-While the window is idle the backend probes the host's event loop with `host.capabilities` (a
+While the window is idle the backend probes the host's event loop with `host.diagnostics` (a
 v1 method; no wire extension). Any answer proves the host is alive, so a slow user never trips
 a deadline. A probe is allowed twice `--rpc-timeout`: a healthy host may be busy for a while
 (a large relayout, a native modal loop), and ending such a session would discard the user's
@@ -100,6 +100,13 @@ request; a host that hangs while the CLI itself is SIGKILLed is left to Core's s
 `--host PATH` > `NATIVEHTMLKIT_HOST_BINARY` > `nativehtmlkit-host` beside the CLI executable >
 `PATH`. Release archives bundle the exact qualified host; its SHA-256 and version are recorded in
 the archive's `manifest.json`. The override variable is for development.
+
+**Core version.** This version is built for and qualified with Core host 1.0.3, which release
+archives bundle. It relies on 1.0.3 behaviour: a new window is first shown with its document
+(no placeholder page), new windows open fully inside the work area, viewport units follow a
+resize (for `--css`/`--html` that use them), and the host reports notifications it had to drop.
+An older 1.0.x host speaks the same protocol version and will run, but those points then behave
+as in that host and the combination is not qualified.
 
 ## Process and data safety
 
@@ -128,8 +135,8 @@ level for the CLI and is exported to the Core host. CLI records are single-line 
 | Level | CLI records |
 |---|---|
 | `off` | none |
-| `normal` (default) | host/transport/protocol failures only: `rpc.timeout`, `rpc.failed`, `backend.failed`, `host.watchdog`, `host.killed`, `session.failed` |
-| `debug` | plus lifecycle and timings: `session.started`, `host.spawned`, `backend.started`, `handshake.completed`, `rpc.completed`, `window.ready`, `host.request`, `submit.rejected`, `submit.accepted`, `user.cancelled`, `deadline.expired`, `session.shutdown`, `host.exited`, `session.completed` |
+| `normal` (default) | host/transport/protocol failures only: `rpc.timeout`, `rpc.failed`, `backend.failed`, `host.watchdog`, `host.killed`, `session.failed`, and `host.notifications_dropped` (the host, Core 1.0.3 or later, discarded window/document events because the backend was not reading: a click may have been lost) |
+| `debug` | plus lifecycle and timings: `session.started`, `host.spawned`, `backend.started`, `handshake.completed`, `rpc.completed`, `window.ready`, `host.request`, `submit.rejected`, `submit.accepted`, `submit.superseded_by_shutdown`, `host.already_shutting_down`, `user.cancelled`, `deadline.expired`, `session.shutdown`, `host.exited`, `session.completed` |
 | `trace` | plus `rpc.started`, `event.received`, `liveness.ok` |
 
 `session_id` comes from `NATIVEHTMLKIT_DIAGNOSTIC_SESSION_ID` when the caller sets a
@@ -173,7 +180,10 @@ binary older than its sources or one that embeds local build paths (build with
 `scripts/build-release.py`). The archive is deterministic: sorted members, owner 0/0, a fixed
 timestamp (`SOURCE_DATE_EPOCH` or 2000-01-01), so repackaging the same inputs gives the same
 bytes. `--publish` (never run by any script here) additionally requires a clean commit, the tag
-`v<version>` pointing at it, and no existing release of that tag. The packager also verifies the
+`v<version>` pointing at it, and no existing release of that tag
+(`python3 scripts/test-publish-gates.py` exercises every gate against a throw-away repository
+and a fake `gh`). For Core 1.0.3 and later the host's embedded source identity
+(`nativehtmlkit-host --version --verbose`) must agree with the release manifest. The packager also verifies the
 archive from a clean extraction, including a headless protocol session between the extracted
 CLI and the bundled host.
 
@@ -195,8 +205,9 @@ Releases are built and verified locally and uploaded to GitHub Releases only on 
 
 ## Releases
 
-Current: [v0.1.1](https://github.com/nativehtmlkit/nativehtmlkit-cli/releases/tag/v0.1.1)
-(prerelease; Linux x86-64 `.tar.gz` and Windows x86-64 `.zip`, each bundling Core host 1.0.2).
-Extract the archive anywhere and run `nhk`; the CLI finds the host beside itself. Verify the
-download against the release's `SHA256SUMS`. What was qualified, and the known limitations, are
-in `docs/QUALIFICATION.md`.
+Prebuilt archives (Linux x86-64 `.tar.gz`, Windows x86-64 `.zip`, each bundling the exact Core
+host it was qualified with) are on the
+[Releases page](https://github.com/nativehtmlkit/nativehtmlkit-cli/releases). Extract an archive
+anywhere and run `nhk`; the CLI finds the host beside itself. Verify the download against the
+release's `SHA256SUMS`. What was qualified for a release, and its known limitations, are in
+that release's notes and in `docs/QUALIFICATION.md`.

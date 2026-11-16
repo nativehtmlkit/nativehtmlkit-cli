@@ -116,7 +116,7 @@ fn host_hangs_while_the_user_is_idle() {
     assert!(backend.conn.idle(Duration::from_millis(600)) >= 2);
     let done = backend.finish();
     let failure = done.failed_with("host.unresponsive");
-    assert_eq!(failure["operation"], "host.capabilities");
+    assert_eq!(failure["operation"], "host.diagnostics");
     assert!(
         done.stderr.contains("appears to have hung"),
         "{}",
@@ -574,4 +574,151 @@ fn notifications_within_the_byte_allowance_are_kept() {
     backend.conn.shutdown();
     let done = backend.finish();
     assert!(done.status.success(), "stderr: {}", done.stderr);
+}
+
+fn reject(conn: &mut Conn, request: &Value, code: i64) {
+    conn.send(json!({"jsonrpc":"2.0","id":request["id"],"error":{"code":code,"message":"Application is shutting down or failed"}}));
+}
+
+/// The user clicks Submit and closes the window in the same instant: the host has begun to
+/// shut down and answers the backend's request with -32008. That is the host ending the
+/// session, not a failure. Nothing was committed, so there is no result (the launcher
+/// reports Cancel) and no error, whichever of the rejection and `app.shutdown` comes first.
+#[test]
+fn submit_colliding_with_shutdown_is_a_close_not_an_error() {
+    for shutdown_first in [false, true] {
+        let mut backend = backend(
+            CLI,
+            &session("select", &["a", "b"], json!({"liveness_interval_ms":0})),
+        );
+        backend.conn.startup();
+        backend.conn.click("nhk-submit");
+        let data = backend.conn.expect("document.command");
+        if shutdown_first {
+            backend.conn.shutdown();
+            reject(&mut backend.conn, &data, -32008);
+        } else {
+            reject(&mut backend.conn, &data, -32008);
+            backend.conn.shutdown();
+        }
+        let done = backend.finish();
+        assert!(
+            done.status.success(),
+            "shutdown_first={shutdown_first}: {}",
+            done.stderr
+        );
+        assert!(done.file("result.json").is_none() && done.file("error.json").is_none());
+        assert_eq!(done.stderr, "");
+        assert_eq!(
+            events(&done.records(), "submit.superseded_by_shutdown").len(),
+            1
+        );
+    }
+}
+
+/// Cancel or Close colliding with a shutdown already under way: what was decided stands.
+#[test]
+fn quit_request_colliding_with_shutdown_keeps_the_decision() {
+    for (mode, control, result) in [
+        ("select", "nhk-cancel", None),
+        ("view", "nhk-done", Some(json!({"kind":"viewed"}))),
+    ] {
+        let mut backend = backend(
+            CLI,
+            &session(mode, &["a"], json!({"liveness_interval_ms":0})),
+        );
+        backend.conn.startup();
+        backend.conn.click(control);
+        let quit = backend.conn.expect("app.request_quit");
+        reject(&mut backend.conn, &quit, -32008);
+        backend.conn.shutdown();
+        let done = backend.finish();
+        assert!(done.status.success(), "{mode}: {}", done.stderr);
+        assert_eq!(
+            done.file("result.json")
+                .map(|t| serde_json::from_str::<Value>(&t).unwrap()),
+            result
+        );
+        assert!(done.file("error.json").is_none());
+    }
+}
+
+/// The accepted result is committed before the quit request, so a collision there still
+/// delivers it.
+#[test]
+fn committed_result_survives_a_shutdown_collision_on_quit() {
+    let mut backend = backend(
+        CLI,
+        &session("select", &["a", "b"], json!({"liveness_interval_ms":0})),
+    );
+    backend.conn.startup();
+    backend.conn.click("nhk-submit");
+    let data = backend.conn.expect("document.command");
+    backend
+        .conn
+        .answer(&data, json!({"entries":[{"name":"selection","value":"1"}]}));
+    let quit = backend.conn.expect("app.request_quit");
+    reject(&mut backend.conn, &quit, -32008);
+    backend.conn.shutdown();
+    let done = backend.finish();
+    assert!(done.status.success(), "{}", done.stderr);
+    assert_eq!(
+        done.json("result.json"),
+        json!({"kind":"selected","indices":[1]})
+    );
+}
+
+/// -32008 without the shutdown it announces is still bounded, and other rejections of the
+/// same request remain failures.
+#[test]
+fn shutdown_collision_is_only_that_code_and_stays_bounded() {
+    let mut backend = backend(
+        CLI,
+        &session(
+            "select",
+            &["a"],
+            json!({"rpc_timeout_ms":300,"liveness_interval_ms":0}),
+        ),
+    );
+    backend.conn.startup();
+    backend.conn.click("nhk-submit");
+    let data = backend.conn.expect("document.command");
+    reject(&mut backend.conn, &data, -32008);
+    let done = backend.finish(); // the host never announces app.shutdown
+    done.failed_with("host.shutdown_timeout");
+    assert!(
+        done.elapsed >= Duration::from_millis(5300 - TICK_MS)
+            && done.elapsed < Duration::from_secs(12)
+    );
+
+    let mut backend = support::backend(
+        CLI,
+        &session("select", &["a"], json!({"liveness_interval_ms":0})),
+    );
+    backend.conn.startup();
+    backend.conn.click("nhk-submit");
+    let data = backend.conn.expect("document.command");
+    reject(&mut backend.conn, &data, -32004);
+    let failure = backend.finish().failed_with("rpc.rejected");
+    assert_eq!(failure["host_code"], -32004);
+}
+
+/// Responses are matched by id, never by order (Core 1.0.3 may answer a path-based
+/// `document.load` after later requests). This client keeps one request outstanding, so a
+/// response carrying any other id, including the id of a request answered earlier, belongs
+/// to nothing and is a violation rather than being taken as the answer to the pending one.
+#[test]
+fn a_response_with_an_earlier_request_id_is_not_taken_for_the_pending_one() {
+    let mut backend = backend(CLI, &select());
+    backend.conn.startup_until("document.load"); // nhk-4 is pending; nhk-3 was answered
+    backend.conn.send(json!({"jsonrpc":"2.0","id":"nhk-3","result":{"document_id":"d-wrong","window_id":"w-wrong"}}));
+    let done = backend.finish();
+    let failure = done.failed_with("protocol.violation");
+    assert_eq!(
+        (
+            failure["operation"].as_str(),
+            failure["request_id"].as_str()
+        ),
+        (Some("document.load"), Some("nhk-4"))
+    );
 }

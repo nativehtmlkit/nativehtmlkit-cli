@@ -26,7 +26,6 @@ const CONNECT_PATIENCE: Duration = Duration::from_secs(10);
 /// Keeping them `&'static` lets diagnostics name the operation without a dynamic string.
 pub mod method {
     pub const HELLO: &str = "host.hello";
-    pub const CAPABILITIES: &str = "host.capabilities";
     pub const DIAGNOSTICS: &str = "host.diagnostics";
     pub const WINDOW_CREATE: &str = "window.create";
     pub const DOCUMENT_LOAD: &str = "document.load";
@@ -434,16 +433,21 @@ impl Client {
         }
     }
 
-    /// Ask the host's event loop to answer a trivial request. Any response, even an error,
-    /// proves it is alive; silence for twice the per-request deadline means it has hung.
-    pub fn probe(&mut self) -> Rpc<()> {
+    /// Ask the host's event loop to answer a trivial request (`host.diagnostics`, which it
+    /// also answers while shutting down). Any response, even an error, proves it is alive;
+    /// silence for twice the per-request deadline means it has hung. Returns the host's
+    /// count of notifications it had to drop for this backend (0 when it does not say).
+    pub fn probe(&mut self) -> Rpc<u64> {
         let started = Instant::now();
         // A healthy host can be busy for a while (a large relayout, a native modal loop).
         // Ending a session over that would discard the user's input, which is worse than
         // noticing a real hang late, so a probe is allowed twice the per-request deadline.
-        match self.call_within(method::CAPABILITIES, json!({}), self.rpc_timeout * 2) {
-            Ok(_) => {}
-            Err(failure) if failure.code == code::RPC_REJECTED => {}
+        let dropped = match self.call_within(method::DIAGNOSTICS, json!({}), self.rpc_timeout * 2) {
+            Ok(answer) => answer
+                .get("dropped_notifications")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
+            Err(failure) if failure.code == code::RPC_REJECTED => 0,
             Err(failure) if failure.code == code::RPC_TIMEOUT => {
                 return Err(failure.recode(
                     code::HOST_UNRESPONSIVE,
@@ -451,11 +455,11 @@ impl Client {
                 ))
             }
             Err(failure) => return Err(failure),
-        }
+        };
         diag::record(Level::Trace, "liveness.ok")
             .duration(started.elapsed())
             .emit();
-        Ok(())
+        Ok(dropped)
     }
 }
 

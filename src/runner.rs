@@ -199,6 +199,12 @@ impl Relay {
     }
 
     fn pump(&mut self) {
+        self.pump_to(&mut io::stderr().lock());
+    }
+
+    /// Forward the complete records that have appeared since the last call, one `write`
+    /// per record (see `diag::write_line`).
+    fn pump_to(&mut self, out: &mut impl Write) {
         let Ok(mut file) = std::fs::File::open(&self.path) else {
             return;
         };
@@ -218,12 +224,10 @@ impl Relay {
             return;
         };
         let complete: Vec<u8> = self.partial.drain(..=end).collect();
-        let mut stderr = io::stderr().lock();
         for line in complete.split(|&b| b == b'\n') {
             // Only this CLI's own record shape is forwarded.
             if line.starts_with(b"{\"schema_version\":1,") && line.len() <= Self::MAX_LINE {
-                let _ = stderr.write_all(line);
-                let _ = stderr.write_all(b"\n");
+                let _ = diag::write_line(out, line);
             }
         }
     }
@@ -519,9 +523,7 @@ pub fn run(options: &Options, session: Session, output_format: OutputFormat) -> 
     };
     match (&session.mode, &outcome) {
         (_, Outcome::TimedOut) => {
-            eprintln!(
-                "nativehtmlkit: no decision before the --timeout deadline; the window was closed"
-            );
+            diag::stderr_line(diag::DEADLINE_NOTICE);
             completed("deadline", EXIT_DEADLINE)
         }
         (Mode::Select, Outcome::Selected { .. })
@@ -706,6 +708,55 @@ mod tests {
         assert!(child.try_wait().unwrap().is_none());
         child.kill().unwrap();
         child.wait().unwrap();
+    }
+
+    /// Regression test for interleaved stderr lines: each relayed backend record is handed
+    /// to the stream as one write ending in its newline; a record whose line is not complete
+    /// yet is held back, and foreign lines are not forwarded.
+    #[test]
+    fn relayed_backend_records_are_one_write_each() {
+        use std::io::Write as _;
+        #[derive(Default)]
+        struct CallLog(Vec<Vec<u8>>);
+        impl Write for CallLog {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.0.push(bytes.to_vec());
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(diag::BACKEND_FILE);
+        let record =
+            |n: u32| format!("{{\"schema_version\":1,\"event\":\"rpc.completed\",\"n\":{n}}}");
+        let mut file = std::fs::File::create(&path).unwrap();
+        write!(
+            file,
+            "{}\n{}\nnot a record\n{}",
+            record(1),
+            record(2),
+            &record(3)[..20]
+        )
+        .unwrap();
+        let mut relay = Relay::new(dir.path());
+        let mut log = CallLog::default();
+        relay.pump_to(&mut log);
+        assert_eq!(
+            log.0,
+            [
+                format!("{}\n", record(1)).into_bytes(),
+                format!("{}\n", record(2)).into_bytes()
+            ]
+        );
+        // The rest of the third record arrives later: it is forwarded then, again as one write.
+        writeln!(file, "{}", &record(3)[20..]).unwrap();
+        relay.pump_to(&mut log);
+        assert_eq!(log.0.len(), 3);
+        assert_eq!(log.0[2], format!("{}\n", record(3)).into_bytes());
+        relay.pump_to(&mut log);
+        assert_eq!(log.0.len(), 3, "nothing is forwarded twice");
     }
 
     #[test]

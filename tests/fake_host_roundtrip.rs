@@ -338,3 +338,63 @@ fn levels_filter_records_and_off_writes_nothing() {
         }
     }
 }
+
+/// The pending request's answer is found by its id among interleaved traffic: notifications
+/// and a host request arrive first, and the events are still delivered afterwards.
+#[test]
+fn the_answer_is_found_by_id_among_interleaved_frames() {
+    let mut backend = backend(
+        CLI,
+        &session("select", &["a", "b"], json!({"liveness_interval_ms":0})),
+    );
+    backend.conn.startup();
+    backend.conn.click("nhk-submit");
+    let data = backend.conn.expect("document.command");
+    // While that request is pending: a click on Cancel, a notification, a host request.
+    backend.conn.click("nhk-row-0");
+    backend.conn.notify(
+        "window.event",
+        json!({"window_id":"w1","event":{"type":"moved"}}),
+    );
+    backend.conn.send(json!({"jsonrpc":"2.0","id":"h9","method":"window.before_close","params":{"window_id":"w1","reason":"user"}}));
+    assert_eq!(backend.conn.frame().unwrap()["id"], "h9");
+    backend
+        .conn
+        .answer(&data, json!({"entries":[{"name":"selection","value":"0"}]}));
+    finish_quit(&mut backend);
+    let done = backend.finish();
+    assert!(done.status.success(), "stderr: {}", done.stderr);
+    assert_eq!(done.json("result.json")["indices"], json!([0]));
+}
+
+/// Core 1.0.3 drops window/document events for a backend that is not reading and reports
+/// the count in `host.diagnostics`. The backend discloses an increase once, at the default
+/// level, because a lost click is exactly a "Submit did nothing" report.
+#[test]
+fn notifications_dropped_by_the_host_are_disclosed() {
+    let mut backend = backend(
+        CLI,
+        &session(
+            "view",
+            &["a"],
+            json!({"diagnostics":"normal","rpc_timeout_ms":400,"liveness_interval_ms":100}),
+        ),
+    );
+    backend.conn.startup();
+    for dropped in [0, 3, 3, 5] {
+        let probe = backend.conn.expect("host.diagnostics");
+        backend.conn.answer(
+            &probe,
+            json!({"phase":"ready","dropped_notifications":dropped}),
+        );
+    }
+    backend.conn.shutdown();
+    let done = backend.finish();
+    assert!(done.status.success(), "stderr: {}", done.stderr);
+    let records = done.records();
+    let totals: Vec<&Value> = events(&records, "host.notifications_dropped")
+        .iter()
+        .map(|r| &r["context"]["total"])
+        .collect();
+    assert_eq!(totals, [&json!(3), &json!(5)]);
+}
