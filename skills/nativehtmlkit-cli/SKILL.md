@@ -39,7 +39,10 @@ Rules:
 - Windows PowerShell 5.1: set `$OutputEncoding = [System.Text.UTF8Encoding]::new($false)` (not
   `[Text.Encoding]::UTF8`, whose BOM breaks `json` input) and `[Console]::OutputEncoding`
   likewise; pipe `Select-Object ... | ConvertTo-Json`; read results with
-  `ConvertFrom-Json -InputObject ($out -join "`n")`.
+  `ConvertFrom-Json -InputObject ($out -join "`n") | ForEach-Object { $_ }` (5.1 returns a
+  JSON array as one object, so `@(ConvertFrom-Json ...)` would hold a single item).
 
-[Examples](references/examples.md) and the full
-[reference](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/REFERENCE.md).
+[Examples](references/examples.md); every option with verified examples for
+[Linux](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/linux/index.md) and
+[Windows](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/windows/index.md);
+the exact [reference](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/REFERENCE.md).
