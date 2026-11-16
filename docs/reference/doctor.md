@@ -29,8 +29,5 @@ started; the other global options are accepted and ignored.
 | it did not exit within 10 s (it is killed) | 1 | `nativehtmlkit: error[host.failed]: the Core host did not answer --version in time (after 10000 ms)` |
 
 Use it first when a command reports `host.not_found`, and to confirm which host a pinned
-installation uses.
-
-```bash
-nativehtmlkit doctor || echo "install the release archive, or set NATIVEHTMLKIT_HOST_BINARY" >&2
-```
+installation uses. Examples: [Linux](../linux/commands/doctor.md),
+[Windows](../windows/commands/doctor.md).

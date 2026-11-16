@@ -48,7 +48,7 @@ Disabled, read-only and hidden controls are not validated.
 ```
 
 That line is the exact result the release's GUI qualification asserts for
-[examples/sample-form.html](../../examples/sample-form.html) after typing `Demo App`, keeping
+[examples/sample-form.html](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/examples/sample-form.html) after typing `Demo App`, keeping
 the default environment and ticking the checkbox.
 
 `entries` are Core's *successful controls* in document order, as HTML form submission defines
@@ -69,21 +69,7 @@ when no file was chosen). Parse the line as JSON; do not rely on key order.
 
 ## Reading the result
 
-```bash
-result=$(nativehtmlkit form --html deploy.html) || exit   # 2 / 124 / 1 end the script
-field() { jq -r --arg n "$1" 'first(.entries[] | select(.name == $n) | .value) // ""' <<<"$result"; }
-env=$(field environment)
-[[ $(field confirm) == yes ]] || { echo 'not confirmed' >&2; exit 1; }
-```
-
-```powershell
-$json = nativehtmlkit form --html deploy.html
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-$values = @{}
-foreach ($e in (ConvertFrom-Json -InputObject ($json -join "`n")).entries) { $values[$e.name] = $e.value }
-$values.environment
-```
-
-Complete, verified scripts: [examples/deploy-form.sh](../../examples/deploy-form.sh),
-[examples/deploy-form.ps1](../../examples/deploy-form.ps1); guide:
-[collecting input with forms](../guides/collecting-input-with-forms.md).
+Parse the line as JSON and look entries up by name: [Linux (bash, `jq`)](../linux/commands/form.md),
+[Windows (PowerShell, `ConvertFrom-Json`)](../windows/commands/form.md). Writing and
+generating forms safely: CSS and forms ([Linux](../linux/css-and-forms.md),
+[Windows](../windows/css-and-forms.md)).

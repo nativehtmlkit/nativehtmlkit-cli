@@ -57,8 +57,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
 ```
 
 (abridged; the exact text is `CSS` in `src/render.rs`). `--css` comes after it, so equal
-selectors in your file win. [examples/css/light.css](../../examples/css/light.css) is a
-complete light theme; [examples/css/form.css](../../examples/css/form.css) lays out a form.
+selectors in your file win. [examples/css/light.css](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/examples/css/light.css) is a
+complete light theme; [examples/css/form.css](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/examples/css/form.css) lays out a form.
 
 ## Rules for trusted content
 

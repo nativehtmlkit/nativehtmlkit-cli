@@ -42,7 +42,8 @@ A `form` page is not counted; the host's own limits apply to your fragment.
 The page contains the built-in style sheet (about 1.3 KB), your `--css`, the escaped title
 and every escaped cell. Escaping grows `&`, `<`, `>`, `"`, `'` to 4-5 bytes each. In
 practice 2,000 lines of 500 characters still fit in a `view`; 2,000 lines of 600 do not.
-Shorten long lines before piping them in (see [viewing logs](../guides/viewing-logs.md)).
+Shorten long lines before piping them in (viewing logs: [Linux](../linux/recipes/logs.md),
+[Windows](../windows/recipes/logs.md)).
 
 ## No limit
 

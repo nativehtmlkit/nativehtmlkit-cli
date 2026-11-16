@@ -40,14 +40,8 @@ them before sharing a log.
 
 ## Using it
 
-```bash
-# what happened, with timings, kept apart from the result
-nativehtmlkit --diagnostics debug select < items.txt > choice.txt 2> session.log
-jq -cR 'fromjson? | select(.component == "nativehtmlkit-cli") | {event, operation, duration_ms, error_code}' session.log
-
-# correlate with your own logs
-NATIVEHTMLKIT_DIAGNOSTIC_SESSION_ID="deploy-$(date +%s)" nativehtmlkit form --html f.html
-```
+Reading the records, a session timeline and correlation ids, with verified examples:
+[Linux](../linux/environment-and-diagnostics.md), [Windows](../windows/environment-and-diagnostics.md).
 
 A debug session that reached the window and timed out looks like this (CLI records only):
 `session.started` -> `host.spawned` -> `backend.started` -> `rpc.completed` for `host.hello`,
@@ -55,4 +49,4 @@ A debug session that reached the window and timed out looks like this (CLI recor
 `deadline.expired` -> `host.request` (`app.before_quit`) -> `rpc.completed` (`app.request_quit`)
 -> `session.shutdown` -> `host.exited` -> `session.completed` (`deadline`, 124).
 
-See also [troubleshooting](../guides/diagnostics-and-troubleshooting.md).
+See also troubleshooting ([Linux](../linux/troubleshooting.md), [Windows](../windows/troubleshooting.md)).

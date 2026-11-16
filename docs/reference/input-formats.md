@@ -35,7 +35,7 @@ RFC 4180-style parsing with `,` (`csv`) or a tab (`tsv`) as delimiter:
 | Rule | Detail |
 |---|---|
 | Header | the first record names the columns, unless `--no-headers` (then `column_1` ... `column_N`, N from the first record) |
-| Quoting | `"` quotes a field; inside quotes the delimiter and line breaks are data and `""` is one `"`. **This also applies to TSV**: a field that *starts* with `"` is parsed as quoted, so `"x<TAB>y` is one unterminated field. A `"` inside an unquoted field is data (`say "hi"` is fine). |
+| Quoting | `"` quotes a field; inside quotes the delimiter and line breaks are data and `""` is one `"`. **This also applies to TSV**: a field that *starts* with `"` is parsed as quoted, so its quotes are removed (`"quoted" start` becomes `quoted start`), and a quote that is never closed swallows the following delimiters and lines (two data lines can become one row; `"x<TAB>y` with too few fields is an error). A `"` inside an unquoted field is data (`say "hi"` is fine). |
 | Record boundary | `\n` or `\r\n` outside quotes |
 | Blank lines | skipped |
 | Field count | every record must have as many fields as the first one: `malformed CSV/TSV record: CSV error: record 1 (line: 2, byte: 4): found record with 3 fields, but the previous record has 2 fields` |
@@ -93,4 +93,4 @@ PowerShell: send objects as JSON (`Select-Object ... | ConvertTo-Json | nativeht
 --input-format json`), choosing the properties first: a raw object easily has more than 32
 properties. In Windows PowerShell 5.1 set `$OutputEncoding = [System.Text.UTF8Encoding]::new($false)`
 first; `[Text.Encoding]::UTF8` would prepend a BOM, which the `json` format rejects
-([Windows PowerShell guide](../guides/windows-powershell.md)).
+([Windows input formats](../windows/input-formats.md)).

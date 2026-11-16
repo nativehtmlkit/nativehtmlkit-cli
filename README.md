@@ -47,11 +47,13 @@ not installed by the Python or PowerShell SDKs.
 
 | | |
 |---|---|
-| **Tutorial** | [Build a project picker step by step](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/tutorials/build-a-project-picker.md) |
-| **How-to guides** | [Git branches, deleting files, processes, Docker, JSON APIs, CSV, xargs, forms, logs, CSS, PowerShell, troubleshooting, headless testing](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/guides/README.md) |
+| **Linux (bash)** | [Install, every command and option with examples, formats, exit codes, recipes, tutorials](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/linux/index.md) |
+| **Windows (PowerShell, cmd.exe)** | [The same for Windows PowerShell 5.1 and PowerShell 7](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/windows/index.md) |
+| **Tutorials** | Project picker ([Linux](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/linux/tutorial.md), [Windows](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/windows/tutorial.md)), Git branch picker ([Linux](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/linux/tutorial-branch-picker.md), [Windows](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/windows/tutorial-branch-picker.md)) |
+| **Recipes** | Git branches, files, processes, services, Docker, JSON APIs, CSV, logs, pipelines, forms, time zones, headless tests ([Linux](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/linux/recipes/index.md), [Windows](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/windows/recipes/index.md)) |
 | **Reference** | [Every command, option, format, limit, exit status and diagnostic](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/REFERENCE.md) |
 | **Explanation** | [Architecture: process model, host discovery, security, lifecycle and watchdogs](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/ARCHITECTURE.md) |
-| **Examples** | [20 verified bash and PowerShell scripts](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/examples/README.md) |
+| **Examples** | [Verified bash and PowerShell scripts, with a machine-readable catalogue](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/examples/README.md) |
 | Qualification | [What was tested for 0.1.2, known limitations](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/QUALIFICATION.md) |
 | Build and test | [Build](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/BUILD.md), [test suites](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/tests/README.md) |
 

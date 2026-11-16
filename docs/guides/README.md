@@ -1,27 +1,24 @@
-# How-to guides
+# How-to guides (moved)
 
-Task recipes for `nativehtmlkit` 0.1.2. Each guide has bash and PowerShell versions; the
-complete scripts are in [examples/](../../examples/README.md) and are verified by
-`scripts/test-examples.sh` (bash) and `scripts/test-examples.ps1` (Windows PowerShell 5.1 and
-PowerShell 7).
+The how-to guides are now recipes in the per-OS sections, each with every example verified
+against the released CLI:
 
-| Guide | You want to |
-|---|---|
-| [Install and find the host](install-and-host-discovery.md) | get the release running and know which Core host it uses |
-| [Handle Cancel, timeout and errors](handling-exit-status.md) | write scripts that treat exit 2, 124 and 1 correctly, also inside pipelines |
-| [Pick a Git branch](picking-a-git-branch.md) | switch branches from a table of recent branches |
-| [Delete files with confirmation](deleting-files-safely.md) | tick files, confirm, delete exactly those |
-| [Choose processes to stop](choosing-processes.md) | pick processes and a signal |
-| [Choose a Docker container](choosing-a-docker-container.md) | pick a container, then an action |
-| [Choose from JSON API output](choosing-from-json-apis.md) | reshape REST/`jq` output into rows and use the selection |
-| [Review and export CSV reports](csv-reports.md) | view a CSV, export chosen rows as CSV |
-| [Multi-select into xargs and pipelines](pipelines-and-xargs.md) | use `select` as one stage of a pipeline |
-| [Collect input with a form](collecting-input-with-forms.md) | deployment parameters with validation, parsed from JSON |
-| [View logs](viewing-logs.md) | show text or JSON logs in a window |
-| [Style windows with CSS](styling-with-css.md) | themes and form layout with `--css` |
-| [Script in Windows PowerShell](windows-powershell.md) | encodings, objects, `$LASTEXITCODE`, 5.1 vs 7 |
-| [Diagnostics and troubleshooting](diagnostics-and-troubleshooting.md) | find out why a command failed |
-| [Test scripts without a desktop](testing-scripts-headless.md) | run your own scripts in CI the way this repository tests its examples |
+| Former guide | Linux (bash) | Windows (PowerShell) |
+|---|---|---|
+| Install and find the host | [Install](../linux/index.md#install), [environment](../linux/environment-and-diagnostics.md) | [Install](../windows/index.md#install), [environment](../windows/environment-and-diagnostics.md) |
+| Handle Cancel, timeout and errors | [Exit codes and scripting](../linux/exit-codes-and-scripting.md) | [Exit codes and scripting](../windows/exit-codes-and-scripting.md) |
+| Pick a Git branch | [recipe](../linux/recipes/git-branch.md) | [recipe](../windows/recipes/git-branch.md) |
+| Delete files with confirmation | [recipe](../linux/recipes/delete-files.md) | [recipe](../windows/recipes/delete-files.md) |
+| Choose processes to stop | [recipe](../linux/recipes/processes.md) | [recipe](../windows/recipes/processes.md) |
+| Choose a Docker container | [recipe](../linux/recipes/docker.md) | [recipe](../windows/recipes/docker.md) |
+| Choose from JSON API output | [recipe](../linux/recipes/json-api.md) | [recipe](../windows/recipes/json-api.md) |
+| Review and export CSV reports | [recipe](../linux/recipes/csv-report.md) | [recipe](../windows/recipes/csv-report.md) |
+| Multi-select into xargs and pipelines | [recipe](../linux/recipes/pipelines.md) | [recipe](../windows/recipes/pipelines.md) |
+| Collect input with a form | [CSS and forms](../linux/css-and-forms.md), [deployment form](../linux/recipes/deploy-form.md) | [CSS and forms](../windows/css-and-forms.md), [deployment form](../windows/recipes/deploy-form.md) |
+| View logs | [recipe](../linux/recipes/logs.md) | [recipe](../windows/recipes/logs.md) |
+| Style windows with CSS | [CSS and forms](../linux/css-and-forms.md) | [CSS and forms](../windows/css-and-forms.md) |
+| Script in Windows PowerShell | | [Windows section](../windows/index.md#set-up-utf-8-once), [input formats](../windows/input-formats.md) |
+| Diagnostics and troubleshooting | [Troubleshooting](../linux/troubleshooting.md) | [Troubleshooting](../windows/troubleshooting.md) |
+| Test scripts without a desktop | [recipe](../linux/recipes/headless-testing.md) | [recipe](../windows/recipes/headless-testing.md) |
 
-New to the CLI? Start with the [tutorial](../tutorials/build-a-project-picker.md). Exact
-behaviour of every option is in the [reference](../REFERENCE.md).
+All recipes: [Linux](../linux/recipes/index.md), [Windows](../windows/recipes/index.md).

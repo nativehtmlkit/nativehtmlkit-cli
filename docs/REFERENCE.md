@@ -43,32 +43,40 @@ nativehtmlkit [GLOBAL OPTIONS] <COMMAND> [COMMAND OPTIONS]
 `--help`, `-h`, `--version`, `-V` exit 0. The result is written in one piece after the window
 has closed, never partially, and never after an error or an interruption.
 
-## Quick examples
+## Usage by operating system
 
-```bash
-printf 'alpha\nbeta\ngamma\n' | nativehtmlkit select --multi             # -> e.g. "alpha\ngamma\n"
-printf 'name,status\na,up\nb,down\n' | nativehtmlkit select --input-format csv --output-format json
-docker ps --format '{{json .}}' | nativehtmlkit select --input-format ndjson
-ps aux | nativehtmlkit view --title 'Processes'
-nativehtmlkit form --html examples/sample-form.html --timeout 300
-nativehtmlkit doctor
-```
+This reference is the exact, OS-neutral specification. Every command, option, format and
+exit status is shown with verified examples in the shell of each OS:
 
-```powershell
-$OutputEncoding = [System.Text.UTF8Encoding]::new($false)   # Windows PowerShell 5.1: send UTF-8 without BOM
-Get-Process | Select-Object Id, ProcessName | ConvertTo-Json | nativehtmlkit select --input-format json --multi
-if ($LASTEXITCODE -eq 2) { 'cancelled' }
-```
+| | Linux (bash) | Windows (PowerShell 5.1 / 7, `cmd.exe`) |
+|---|---|---|
+| Start here: install, first command | [Linux](linux/index.md) | [Windows](windows/index.md) |
+| `select` | [select](linux/commands/select.md) | [select](windows/commands/select.md) |
+| `view` | [view](linux/commands/view.md) | [view](windows/commands/view.md) |
+| `form` | [form](linux/commands/form.md) | [form](windows/commands/form.md) |
+| `doctor`, `help`, `--version` | [doctor](linux/commands/doctor.md) | [doctor](windows/commands/doctor.md) |
+| Input formats | [input formats](linux/input-formats.md) | [input formats](windows/input-formats.md) |
+| Output formats | [output formats](linux/output-formats.md) | [output formats](windows/output-formats.md) |
+| Exit codes in scripts | [exit codes](linux/exit-codes-and-scripting.md) | [exit codes](windows/exit-codes-and-scripting.md) |
+| Environment, diagnostics | [environment](linux/environment-and-diagnostics.md) | [environment](windows/environment-and-diagnostics.md) |
+| `--css`, `--html` | [CSS and forms](linux/css-and-forms.md) | [CSS and forms](windows/css-and-forms.md) |
+| Troubleshooting | [troubleshooting](linux/troubleshooting.md) | [troubleshooting](windows/troubleshooting.md) |
+| Recipes | [recipes](linux/recipes/index.md) | [recipes](windows/recipes/index.md) |
+| Tutorials | [project picker](linux/tutorial.md), [branch picker](linux/tutorial-branch-picker.md) | [project picker](windows/tutorial.md), [branch picker](windows/tutorial-branch-picker.md) |
 
-More: [how-to guides](guides/README.md), [tutorial](tutorials/build-a-project-picker.md),
-[runnable examples](../examples/README.md), [architecture](ARCHITECTURE.md).
+Runnable scripts: [example catalogue](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/examples/README.md)
+([catalog.toml](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/examples/catalog.toml)).
+Internals: [architecture](ARCHITECTURE.md).
 
 ## Verification
 
 The statements in this reference that concern input parsing, limits, option validation, exit
 statuses and the stderr lines are asserted by `scripts/test-examples.sh` against the released
 `nativehtmlkit-cli-v0.1.2-linux-x64` archive with its bundled Core 1.0.3 host, headless
-(`NATIVEHTMLKIT_CLI_TEST_HEADLESS=1`). Output formats and the GUI behaviour (selection order,
-Cancel, window close, form validation, keyboard use) are asserted by the release's GUI
-qualification on KDE Plasma Wayland and Windows Server 2022 (`tests/gui/`, 49/49 per platform)
-and by the unit tests in `src/output.rs`. See [QUALIFICATION.md](QUALIFICATION.md).
+(`NATIVEHTMLKIT_CLI_TEST_HEADLESS=1`). Every example of the Linux and Windows sections is run
+by `scripts/test-docs.py` (bash, Linux archive) and `scripts/test-docs.ps1` (Windows
+PowerShell 5.1 with the Windows archive, and PowerShell 7), which also check the exact
+output shown for a Submit against the release's own formatting code. The GUI behaviour
+(selection order, Cancel, window close, form validation, keyboard use, Ctrl+C) is asserted
+by the release's GUI qualification on KDE Plasma Wayland and Windows Server 2022
+(`tests/gui/`, 49/49 per platform). See [QUALIFICATION.md](QUALIFICATION.md).

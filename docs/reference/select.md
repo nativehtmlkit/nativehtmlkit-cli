@@ -42,28 +42,8 @@ toggles, Enter or Space activates a focused button).
 
 ## Examples
 
-```bash
-# one line back
-branch=$(git branch --format='%(refname:short)' | nativehtmlkit select --title 'Branch')
+Every option of `select` with a verified example: [Linux (bash)](../linux/commands/select.md),
+[Windows (PowerShell)](../windows/commands/select.md).
 
-# several, NUL-free lines into xargs (GNU xargs -d)
-ls *.log | nativehtmlkit select --multi | xargs -r -d '\n' gzip --
-
-# CSV in, JSON out: field access by column name
-nativehtmlkit select --input-format csv --output-format json < servers.csv | jq -r '.[].host'
-
-# accept "nothing" as an answer
-printf 'cache\nlogs\n' | nativehtmlkit select --multi --allow-empty --title 'Also clear' || exit
-```
-
-```powershell
-$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-$json = Get-Service | Select-Object Name, Status | ConvertTo-Json |
-    nativehtmlkit select --input-format json --output-format json --multi
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-(ConvertFrom-Json -InputObject ($json -join "`n")) | ForEach-Object Name
-```
-
-Related: [handling exit statuses](../guides/handling-exit-status.md),
-[examples/pick-git-branch.sh](../../examples/pick-git-branch.sh),
-[examples/delete-files.sh](../../examples/delete-files.sh).
+Related: exit statuses in scripts ([Linux](../linux/exit-codes-and-scripting.md),
+[Windows](../windows/exit-codes-and-scripting.md)).

@@ -32,20 +32,9 @@ nativehtmlkit view [OPTIONS]
 
 ## Examples
 
-```bash
-ps aux | nativehtmlkit view --title 'Processes'
-journalctl -n 500 --no-pager | tail -n 2000 | nativehtmlkit view --title 'Journal'   # entries can span lines
-nativehtmlkit view --input-format csv --title 'Servers' < examples/data/servers.csv
-nativehtmlkit view --input-format ndjson < examples/data/app.ndjson
-```
-
-```powershell
-Get-Content .\app.log -Tail 500 | nativehtmlkit view --title 'app.log'
-Get-ChildItem -File | Select-Object Name, Length, @{ n = 'Modified'; e = { $_.LastWriteTime.ToString('s') } } |
-    ConvertTo-Json | nativehtmlkit view --input-format json
-```
+Every option of `view` with a verified example: [Linux (bash)](../linux/commands/view.md),
+[Windows (PowerShell)](../windows/commands/view.md).
 
 `view` returns only when the window is closed (or the deadline passes), so a script waits
-at that line.
-
-Related: [viewing logs](../guides/viewing-logs.md), [examples/view-logs.sh](../../examples/view-logs.sh).
+at that line. Related: viewing logs ([Linux](../linux/recipes/logs.md),
+[Windows](../windows/recipes/logs.md)).

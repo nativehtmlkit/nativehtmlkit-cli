@@ -85,26 +85,6 @@ For more information, try '--help'.
 
 ## Handling it in scripts
 
-```bash
-status=0
-out=$(printf 'a\nb\n' | nativehtmlkit select) || status=$?
-case $status in
-  0)   echo "chose: $out" ;;
-  2)   echo "cancelled" >&2 ;;
-  124) echo "no answer in time" >&2 ;;
-  *)   echo "failed ($status)" >&2; exit 1 ;;
-esac
-```
-
-```powershell
-$out = 'a', 'b' | nativehtmlkit select
-switch ($LASTEXITCODE) {
-    0       { "chose: $out" }
-    2       { Write-Warning 'cancelled' }
-    124     { Write-Warning 'no answer in time' }
-    default { throw "nativehtmlkit failed ($LASTEXITCODE)" }
-}
-```
-
-In a pipeline the status of the CLI is not the pipeline's status: see
-[handling exit statuses](../guides/handling-exit-status.md) for `PIPESTATUS` and `pipefail`.
+Capturing the status, helpers that stop on Cancel, the CLI inside a pipeline, writing files
+only after success, signals: [Linux (bash)](../linux/exit-codes-and-scripting.md),
+[Windows (PowerShell, `cmd.exe`)](../windows/exit-codes-and-scripting.md).
