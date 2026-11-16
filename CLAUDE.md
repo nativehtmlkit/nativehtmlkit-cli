@@ -1,3 +1,3 @@
-# CLI agent entry point
+# Claude Code instructions
 
-Read `AGENTS.md`, `README.md`, and `docs/QUALIFICATION.md`. This is an independent Rust repository. Review sibling Core `protocol/README.md` only if available. Local-only builds, tests, artifacts and optional explicit GitHub Releases; never start GitHub Actions workflows. Treat unverified native scenarios as BLOCKED.
+Follow [AGENTS.md](AGENTS.md) as the authoritative instructions for this repository. The private Project workspace owns approval and issue tracking. Do not duplicate policies or implement cross-repository fixes silently.

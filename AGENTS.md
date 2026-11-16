@@ -1,13 +1,16 @@
-# NativeHTMLKit CLI — Agent instructions
+# nativehtmlkit-cli — development-agent instructions
 
-1. This is an independent Rust CLI repo. Do NOT depend on `../nativehtmlkit-core/crates/*`, embed the renderer, launch a Python/PowerShell SDK or rebuild Core as an implicit packaging step.
-2. Read `README.md` and `docs/QUALIFICATION.md` first. The Core protocol v1 contract (public-stable 1.0 since Core 1.0.3) is located in the sibling Core repository when present; standalone clones must use a released Core protocol artifact.
-3. CLI public executable is `nativehtmlkit` and short alias `nhk`. The binary's hidden `__backend` subcommand is for the Core-supervised process; users invoke `select`, `view`, `form`, `doctor`.
-4. The input source is stdin, output bytes go only to stdout after Submit; any logs must go to stderr. Exit code 2 means Cancel; errors fail closed.
-5. Complete/verify local integration with Core v1 before declaring a stable release. Maintain source-derived protocol compatibility, not optimistic assumptions.
-6. Run `bash scripts/test-local.sh` while editing. Before claiming qualification run the complete gates against one exact host: `python3 scripts/qualify.py run --host … --host-version … --host-sha256 … --evidence …` (source gates, fake-host suites, real host headless, packaging), then the native GUI harnesses in `tests/gui/` from a clean extraction of the archive (`scripts/lab/qualify-linux.sh` / `qualify-windows.sh` do both on the lab machines). Evidence includes actual screenshots/traces and process cleanup. Never fabricate PASS status; a failed assertion is FAIL, a missing prerequisite is BLOCKED with its cause.
-6a. Bounded operations and privacy are contract (README "Waiting for the user vs. a hung host", "Diagnostics"): no unbounded read, write or wait on the host except the sliced, liveness-probed wait for the user; failures and diagnostic records never carry stdin data, selections, form values, host-authored text or the launch token. Add a fault-injection test in `tests/fake_host_faults.rs` or `tests/launcher_e2e.rs` for every new failure path.
-7. No GitHub Actions, remote CI or registry publication; local builds and local verification only. `gh release create` is permitted only when explicitly requested.
-8. Report Core defects in project `docs/bugs/bug_list.md` when available; don't secretly edit Core from within the CLI task.
-9. Preserve this repository as independently cloneable/buildable. Local host override can be set through `NATIVEHTMLKIT_HOST_BINARY` for development; distributions consume pinned qualified Core artifacts.
-10. See `../..` project shared instructions when available, otherwise use these instructions without assuming another checkout exists.
+**Ownership:** Standalone Rust native CLI.
+
+This is an independent Git repository in the NativeHTMLKit ecosystem. Central issue tracking, approval and cross-repository coordination are in the private workspace `nativehtmlkit-project` under `work/bugs/` and `work/features/` (normally at `../../work/`). When cloning this repository alone, locate that private workspace using `NHK_PROJECT_ROOT`; do not create a duplicate issue register in this repository.
+
+## Mandatory behavior
+
+1. Read the root Project `AGENTS.md`, `governance/SCOPE.md`, `governance/ARCHITECTURE.md`, `governance/WORKFLOW.md`, and generated `STATUS.md` if the workspace is available. Read this repository's README, `docs/ARCHITECTURE.md` and `docs/BUILD.md` as relevant.
+2. Only implement an expressly approved `B-####` or `F-####` task. Scope repository changes to the assigned issue; unrelated defects must be recorded and deferred, unless blocking or security-critical.
+3. CLI owns command parsing, launcher, execution, host supervision, input/output formats and Rust tests. Use the public host contract only; do not rewrite Core or SDK to implement a CLI feature.
+4. Never silently modify another repository, publish packages, create release tags, bump versions, erase test evidence or change native host binaries. Those actions need separate task authorization and qualification.
+5. Verify against the actual public API and released binary versions. Report exact commands, pass/fail/skip, runtime/OS and outstanding issues. Keep issue records current and regenerate central `STATUS.md` after work.
+6. Public README/API/tutorials contain **only** verified user-facing information and never private workspace logs, credential details or release plans. Repo-local architecture is owned here, not duplicated in landing docs.
+
+For this repository's public user documentation, start at its `README.md` and `docs/`. For public onboarding across all entrypoints, see https://github.com/nativehtmlkit/nativehtmlkit .
