@@ -1,0 +1,3 @@
+{"time":"2026-11-16T09:00:01Z","level":"info","msg":"server listening","port":8080}
+{"time":"2026-11-16T09:01:12Z","level":"warn","msg":"slow query","duration_ms":812}
+{"time":"2026-11-16T09:02:40Z","level":"error","msg":"upstream timeout","retry":1,"upstream":{"host":"api-01"}}

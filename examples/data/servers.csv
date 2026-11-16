@@ -1,0 +1,8 @@
+host,role,region,cpu_cores,memory_gib,status,notes
+web-01,frontend,eu-west,4,8,healthy,
+web-02,frontend,eu-west,4,8,degraded,"disk 91% full, cleanup scheduled"
+api-01,backend,eu-west,8,32,healthy,
+api-02,backend,us-east,8,32,healthy,"canary for ""v2"" API"
+db-01,database,eu-west,16,128,healthy,primary
+db-02,database,us-east,16,128,maintenance,"replica, patching until 18:00"
+cache-01,cache,eu-west,2,16,healthy,

@@ -1,0 +1,13 @@
+/* A light theme for any command (passed with --css). The CLI's page defines its colours
+   as custom properties on :root; overriding them recolours the whole window. */
+:root {
+  color-scheme: light;
+  --background: #f6f7f9; --panel: #ffffff; --border: #c9d1dc; --text: #1d2430; --accent: #2f6fd0;
+}
+th { background: #e8edf4; }
+tr:hover { background: #eef3fb; }
+td, th { border-bottom-color: #dde3ea; }
+button { background: #ffffff; border-color: #b8c2cf; }
+button.primary { background: #2f6fd0; border-color: #2f6fd0; color: #ffffff; }
+small, .muted { color: #5b6778; }
+.error { color: #b3261e; }

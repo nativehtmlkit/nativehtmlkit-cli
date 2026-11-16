@@ -1,0 +1,11 @@
+/* Trusted stylesheet for deploy-form.sh / deploy-form.ps1 (passed with --css).
+   It is appended after the CLI's built-in style sheet, so these rules win. */
+#nhk-form { display: grid; gap: 12px; max-width: 520px; }
+#nhk-form label { display: grid; gap: 4px; }
+#nhk-form label.check { display: flex; gap: 8px; align-items: center; }
+#nhk-form fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; display: flex; gap: 18px; }
+#nhk-form fieldset label { display: flex; gap: 6px; align-items: center; }
+#nhk-form input:not([type=checkbox]):not([type=radio]), #nhk-form select, #nhk-form textarea {
+  background: var(--panel); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 7px 9px; font: inherit;
+}

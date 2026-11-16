@@ -1,0 +1,5 @@
+/* proj.sh window style: a green accent and a smaller heading. Passed with --css; trusted input. */
+:root { --accent: #3fa37a; }
+h1 { font-size: 18px; letter-spacing: .02em; }
+td { color: #dfe7f1; }
+button.primary { background: #2f8a63; border-color: #3fa37a; }

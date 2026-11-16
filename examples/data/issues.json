@@ -1,0 +1,10 @@
+[
+  {"number": 42, "title": "Window opens off-screen on a second monitor", "html_url": "https://example.invalid/issues/42",
+   "user": {"login": "ada"}, "labels": [{"name": "bug"}, {"name": "windows"}], "updated_at": "2026-11-12T09:15:00Z"},
+  {"number": 41, "title": "Document the <form> limits", "html_url": "https://example.invalid/issues/41",
+   "user": {"login": "grace"}, "labels": [{"name": "docs"}], "updated_at": "2026-11-10T17:02:11Z"},
+  {"number": 40, "title": "Add a dark/light theme switch", "html_url": "https://example.invalid/pull/40",
+   "user": {"login": "linus"}, "labels": [], "updated_at": "2026-11-09T08:00:00Z", "pull_request": {}},
+  {"number": 39, "title": "Příliš žluťoučký kůň: Unicode in titles & \"quotes\"", "html_url": "https://example.invalid/issues/39",
+   "user": {"login": "zoë"}, "labels": [{"name": "i18n"}], "updated_at": "2026-11-01T12:00:00Z"}
+]

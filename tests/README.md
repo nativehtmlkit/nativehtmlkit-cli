@@ -8,6 +8,8 @@
 | `launcher_e2e.rs` | the real `nativehtmlkit` executable as a pipeline stage: exact stdout bytes, exit status, stderr discipline, watchdog (hung, crashed, never-started host), signals, diagnostics propagation, privacy sentinel, cleanup of processes and the session directory | nothing |
 | `scripts/qualify.py run` (real-host checks) | the release binary against the real pinned Core host, headless: handshake, liveness, deadline, session-id correlation with host records, privacy at trace level, a frozen host, a killed host | a Core host binary |
 | `scripts/test-publish-gates.py` | every publish gate of the packager (dirty tree, missing or misplaced tag, missing `gh`, existing release, stale manifest) and the upload step, against a throw-away Git repository and a fake `gh`; nothing is published | git |
+| `scripts/test-examples.sh` | every bash example in `examples/`, the tutorial, the snippets in `README.md`/`docs/`, and the documented input formats, limits, option validation, exit statuses and stderr lines, against a real CLI and host, headless; replay cases check the examples' handling of a submitted result | a CLI release (its host beside it), `jq`, `git`, `perl` |
+| `scripts/test-examples.ps1` | the PowerShell examples and documentation snippets the same way, in Windows PowerShell 5.1 (`-Shell powershell.exe`) or PowerShell 7 | a CLI release, PowerShell |
 | `tests/gui/linux-kde-wayland.sh`, `tests/gui/windows-interactive.ps1` | real windows and real input on KDE Plasma Wayland and an interactive Windows desktop, from a clean extraction of the release archive | a desktop session |
 
 `cargo test` runs the first four on Linux and Windows. They use the platform's real transport
