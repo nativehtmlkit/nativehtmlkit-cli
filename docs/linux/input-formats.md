@@ -137,7 +137,7 @@ for example with Python's `csv` module:
 <!-- test: exit=124 calls="124@2x2" -->
 ```bash
 printf 'host;status\nweb-01;healthy\nweb-02;degraded\n' |
-  python3 -c 'import csv,sys; csv.writer(sys.stdout, lineterminator="\n").writerows(csv.reader(sys.stdin, delimiter=";"))' |
+  uv run python -c 'import csv,sys; csv.writer(sys.stdout, lineterminator="\n").writerows(csv.reader(sys.stdin, delimiter=";"))' |
   nativehtmlkit select --input-format csv
 ```
 
