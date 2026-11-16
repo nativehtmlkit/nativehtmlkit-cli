@@ -1,25 +1,59 @@
 # NativeHTMLKit CLI
 
-**Give a shell command a native desktop window** without embedding a browser or shipping a Python runtime.
+**Give a shell command a native desktop window** without embedding a browser or shipping a
+Python runtime. Pipe records in, let a person pick, view or fill in a form, and get exactly
+the chosen data back on stdout, with an exit status your script can trust.
 
 ```bash
-printf 'alpha\nbeta\ngamma\n' | nativehtmlkit select --multi
-printf 'name,status\na,up\nb,down\n' | nativehtmlkit select --input-format csv --multi --output-format json
-ps aux | nativehtmlkit view
-nativehtmlkit form --html examples/sample-form.html
-nativehtmlkit doctor
+printf 'alpha\nbeta\ngamma\n' | nativehtmlkit select --multi                 # tick rows -> chosen lines
+git branch --format='%(refname:short)' | nativehtmlkit select --title 'Switch branch'
+docker ps --format '{{json .}}' | nativehtmlkit select --input-format ndjson --output-format json
+nativehtmlkit select --input-format csv --output-format json --multi < servers.csv | jq -r '.[].host'
+ps aux | nativehtmlkit view --title 'Processes'                              # read-only, no stdout
+nativehtmlkit form --html examples/sample-form.html --timeout 600            # -> {"entries":[...]}
+nativehtmlkit doctor                                                         # which host, which version
 ```
 
-The executable may also be available as `nhk`. `select` writes only the accepted selection to stdout; cancel exits **2**, timed out user action **124**, interruption **130**, and ordinary errors **1**. `view` is read-only. Errors and diagnostics go to stderr. There is no default timeout on how long a person may decide.
+```powershell
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+Get-Process | Select-Object Id, ProcessName | ConvertTo-Json |
+    nativehtmlkit select --input-format json --output-format json --multi
+if ($LASTEXITCODE -eq 2) { 'cancelled' }
+```
 
-The CLI is an independent Rust client of Core's local wire-v1 host. Release **0.1.2** contains Linux and Windows x64 assets on [GitHub Releases](https://github.com/nativehtmlkit/nativehtmlkit-cli/releases). This executable is not installed by the Python SDK.
+| Exit | Meaning | stdout |
+|---|---|---|
+| 0 | submitted / viewer closed | the result only (nothing for `view`) |
+| 2 | Cancel or window closed | empty |
+| 124 | `--timeout` passed | empty |
+| 1 | error; `nativehtmlkit: error[<code>]: ...` on stderr | empty |
+| 130 / 143 / 129 | SIGINT / SIGTERM / SIGHUP | empty |
 
-| Read next | Link |
+Input formats `lines`, `csv`, `tsv`, `json`, `ndjson` (UTF-8, at most 8 MiB, 2,000 rows,
+32 columns); rows come back in input order and byte-exact. Piped data is always shown as
+escaped text; only `--html` and `--css` files are trusted markup. There is no default limit
+on how long a person may take, while a hung host is detected and stopped.
+
+## Install
+
+Release **0.1.2** (Linux x86-64, Windows x86-64) on
+[GitHub Releases](https://github.com/nativehtmlkit/nativehtmlkit-cli/releases/tag/v0.1.2).
+Each archive bundles the exact Core host 1.0.3 it was qualified with: verify it against
+`SHA256SUMS`, extract it anywhere and run `nhk doctor`. The executable is `nativehtmlkit`, with
+the alias `nhk`. It is an independent Rust client of Core's local wire protocol v1 and is
+not installed by the Python or PowerShell SDKs.
+
+## Documentation
+
+| | |
 |---|---|
-| Full commands, input formats and exit behavior | [CLI reference](docs/REFERENCE.md) |
-| Integration with Core | [Architecture](docs/ARCHITECTURE.md) |
-| Build and test | [Build](docs/BUILD.md) |
-| Guided examples | [Public tutorials](https://github.com/nativehtmlkit/nativehtmlkit/blob/main/docs/tutorials/cli-selection.md) |
+| **Tutorial** | [Build a project picker step by step](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/tutorials/build-a-project-picker.md) |
+| **How-to guides** | [Git branches, deleting files, processes, Docker, JSON APIs, CSV, xargs, forms, logs, CSS, PowerShell, troubleshooting, headless testing](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/guides/README.md) |
+| **Reference** | [Every command, option, format, limit, exit status and diagnostic](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/REFERENCE.md) |
+| **Explanation** | [Architecture: process model, host discovery, security, lifecycle and watchdogs](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/ARCHITECTURE.md) |
+| **Examples** | [20 verified bash and PowerShell scripts](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/examples/README.md) |
+| Qualification | [What was tested for 0.1.2, known limitations](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/QUALIFICATION.md) |
+| Build and test | [Build](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/docs/BUILD.md), [test suites](https://github.com/nativehtmlkit/nativehtmlkit-cli/blob/main/tests/README.md) |
 
 ## Project navigation
 
