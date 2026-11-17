@@ -28,6 +28,9 @@ release archives against their bundled Core 1.0.3 hosts:
 | GUI suite from the extracted archive, real input (`tests/gui/`) | 49/49 PASS | 49/49 PASS |
 | **Total** | **69 PASS** | **69 PASS** |
 
+The GUI harnesses in `tests/gui/` are run inside a real desktop session; the lab qualification
+wrappers that drive them on the maintainers' machines are maintained privately.
+
 GUI cases (each asserts exact stdout bytes, exit status and no leftover processes): single
 and multi-select, input order independent of click order, Cancel and title-bar close (2),
 empty-Submit message then success, invalid JSON / ragged CSV / empty input / invalid UTF-8 /

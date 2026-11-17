@@ -1,8 +1,8 @@
 ﻿# Native Windows interactive-desktop qualification for the NativeHTMLKit CLI.
 #
-# Must run INSIDE a logged-in interactive desktop (RDP or console), e.g. started from an
-# administrative SSH session with the original UI4ME helper:
-#   start_interactive.ps1 -UserName <desktop user> -ScriptPath <this file> -TimeoutSeconds 900
+# Must run INSIDE a logged-in interactive desktop (RDP or console). When started from an
+# administrative SSH session, use an interactive desktop session launcher that runs this
+# script in the desktop user's session and waits for it with a timeout (e.g. ~900 s).
 # $Root\bin is a clean extraction of the release archive (nativehtmlkit.exe, nhk.exe,
 # nativehtmlkit-host.exe, examples\sample-form.html).
 # SSH alone has no desktop and is not GUI evidence. UI Automation is used ONLY to locate

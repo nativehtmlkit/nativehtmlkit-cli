@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Native KDE Plasma Wayland qualification for the NativeHTMLKit CLI.
 #
-# Runs INSIDE the logged-in Wayland session host (e.g. the lab VM linuxDEV) as the
+# Runs INSIDE a logged-in KDE Plasma Wayland session as the
 # desktop user. Real windows are opened, real input is injected with ydotool (uinput),
 # and screenshots are taken with spectacle. Every case records exact stdout bytes,
 # stderr, exit status and screenshots under $OUT/<case>/ and a PASS/FAIL line in
